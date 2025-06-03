@@ -1,4 +1,4 @@
-from new import *
+from main import *
 from time import time
 from dataclasses import dataclass
 from tqdm import tqdm
