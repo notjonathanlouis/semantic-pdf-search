@@ -2,35 +2,78 @@ import random
 from math import *
 from torch import Tensor
 import torch
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 from abc import ABC
 import pypdf
 from typing import Optional
 import os
 import pickle
+import logging
 
-class AbstractEncoder(ABC):
+logger = logging.getLogger("pypdf")
+logger.setLevel(logging.NOTSET)
+
+
+def get_ranks(scores : Tensor, top_k : Optional[int] = None) -> list[int]:
+    return torch.sort(scores, descending=True)[1][:top_k].tolist()
+class AbstractModel(ABC):
 
     def __call__(self, text : str) -> Tensor: ...
 
+    def encoder_name(self) -> str:
+        return self.__str__()
 
-class SentenceEncoder(AbstractEncoder):
+    def can_rerank(self) -> bool:
+        return False
 
-    MODEL1 = "all-MiniLM-L6-v2"
-    MODEL2 = "all-mpnet-base-v2"
+    def rerank(self, query : str, unordered_texts: list[str], current_scores : Tensor, rerank_count : int) -> list[int]:
+        raise NotImplementedError("Not implemented")
+
+
+class SentenceEncoder(AbstractModel):
+
+    MODEL1 = "all-MiniLM-L6-v2" # seems good
+    MODEL2 = "all-mpnet-base-v2" # too slow, bad performance
 
     def __init__(self, model_name : str) -> None:
         self.name = model_name
         self.model = SentenceTransformer(model_name)
         
     def __str__(self) -> str:
-        return self.name
+        return "Encoder: " + self.name
 
     def __call__(self, text : str) -> Tensor:
         return self.model.encode(text, convert_to_tensor=True)
 
 
+class RerankingEncoder(SentenceEncoder):
 
+    MODEL1 = "cross-encoder/ms-marco-TinyBERT-L2-v2"
+
+    def __init__(self, embedder_name : str, reranker_name : str) -> None:
+        super().__init__(embedder_name)
+        self.reranker_name = reranker_name
+        self.reranker_model = CrossEncoder(reranker_name)
+
+    def __str__(self):
+        return f"Reranking: {self.reranker_name}/{self.name}"
+
+    def encoder_name(self) -> str:
+        return super().__str__()
+
+    def can_rerank(self) -> bool:
+        return True
+    
+    def rerank(self, query : str, unordered_texts: list[str], current_scores : Tensor, rerank_count : int) -> list[int]:
+        ranks = get_ranks(current_scores, top_k = rerank_count)
+        ordered_texts = [unordered_texts[i] for i in ranks]
+        arg_list = [(query, text) for text in ordered_texts]
+        res = self.reranker_model.predict(arg_list, convert_to_tensor=True)
+        max_val = torch.min(res)
+        min_val = 0
+        steps = len(unordered_texts) - rerank_count
+        res = torch.cat([res, torch.linspace(max_val, min_val, steps, device = res.device)])
+        return get_ranks(res)
 
 
 def hash_str(text : str):
@@ -55,7 +98,7 @@ class Corpus:
 class Searcher:
 
     def __init__(self, 
-                 model : AbstractEncoder,
+                 model : AbstractModel,
                  corpus : Corpus,
                  path : str = "embeddings"):
         
@@ -63,13 +106,16 @@ class Searcher:
         self.corpus = corpus
         self.encodings = self.__load_embeddings(path)
 
-    def __load_embeddings(self,path : str) -> Tensor:
+    def __load_embeddings(self, path : str) -> Tensor:
         OPEN = True
         if path not in os.listdir("."):
             os.mkdir(f"./{path}")
+        dir = f"./{path}/{self.model.encoder_name()}"
+        if self.model.encoder_name() not in os.listdir(f"./{path}"):
+            os.mkdir(dir)
         corpus_hash = hash(self.corpus)
-        file_path = f"./{path}/{corpus_hash}"
-        if OPEN and f"{corpus_hash}" in os.listdir(f"./{path}"):
+        file_path = f"./{dir}/{corpus_hash}"
+        if OPEN and f"{corpus_hash}" in os.listdir(dir):
             with open(file_path, "rb") as f:
                 return pickle.load(f)
         else:
@@ -79,7 +125,7 @@ class Searcher:
             return enc
 
     @staticmethod
-    def forPDF(model : AbstractEncoder, path : str) -> "Searcher":
+    def forPDF(model : AbstractModel, path : str) -> "Searcher":
         reader = pypdf.PdfReader(path)
         corpus = Corpus([page.extract_text() for page in reader.pages])
         return Searcher(model, corpus)
@@ -91,7 +137,9 @@ class Searcher:
 
         query_enc = torch.stack([self.model(query)] * self.encodings.shape[1], dim = 1)
         similarities = torch.cosine_similarity(query_enc, self.encodings, dim = 0)
-        print(torch.sort(similarities, descending=True)[1])
-        return torch.sort(similarities, descending=True)[1][:top_k].tolist()
+        if self.model.can_rerank():
+            return self.model.rerank(query, self.corpus.texts, similarities, 20)
+        else:
+            return get_ranks(similarities,top_k)
     
 

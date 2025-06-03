@@ -1,4 +1,4 @@
-from main import *
+from new import *
 from time import time
 from dataclasses import dataclass
 from tqdm import tqdm
@@ -12,26 +12,26 @@ class BenchmarkResult:
 
 class Benchmarker:
 
-    def __init__(self, encoders : list[AbstractTextEncoder], suite : dict[str, dict[str, int]]):
+    def __init__(self, encoders : list[AbstractModel], suite : dict[str, dict[str, int]]):
         self.encoders = encoders      
         self.suite = suite
 
-    def run_for(self, enc : AbstractTextEncoder) -> BenchmarkResult:
+    def run_for(self, enc : AbstractModel) -> BenchmarkResult:
         times = []
         scores = []
-        for pdf in tqdm(self.suite, desc = "PDFS"):
-            for query in tqdm(self.suite[pdf], desc = "Query"):
+        for pdf in tqdm(self.suite, desc = "PDFS", position=1):
+            for query in tqdm(self.suite[pdf], desc = "Query", position=2):
+                searcher = Searcher.forPDF(enc, f"pdfs/{pdf}")
                 expected_page = self.suite[pdf][query]
                 start_time = time()
-                ranked_pages = enc.search_for_page(query, f"pdfs/{pdf}", None)
+                ranked_pages = searcher(query, None)
                 times.append(time() - start_time)
-                scores.append(ranked_pages.index(expected_page)/len(ranked_pages))
-        
+                scores.append(1 - (ranked_pages.index(expected_page)/len(ranked_pages)))
         return BenchmarkResult(sum(scores)/len(scores), sum(times)/len(times))
 
     def run_all(self) -> dict[str, BenchmarkResult]:
         out = {}
-        for encoder in tqdm(self.encoders, desc = "Models"):
+        for encoder in tqdm(self.encoders, desc = "Models", position=0):
             out[str(encoder)] = self.run_for(encoder)
         return out
         
@@ -59,11 +59,11 @@ BENCHMARK = {
         "## concat tokens" : 209
     },
     "compilers.pdf" : {
-        "lex with regex": 30
+        "lex with regex": 41
     }
 }
 
 
 if __name__ == "__main__":
-    benchmarker = Benchmarker([SentenceTransformerTextEncoder(MODEL1), SentenceTransformerTextEncoder(MODEL2)], BENCHMARK)
+    benchmarker = Benchmarker([RerankingEncoder(SentenceEncoder.MODEL1, RerankingEncoder.MODEL1), SentenceEncoder(SentenceEncoder.MODEL1)], BENCHMARK)
     print(benchmarker.run_all())
