@@ -18,9 +18,8 @@ if __name__ == "__main__":
     if query[0] == '"':
         query = query[1:-2]
     search = Searcher.forPDF(
-        RerankingEncoder(
-            SentenceEncoder.MODEL1, 
-            RerankingEncoder.MODEL1),
+        SentenceEncoder(
+            SentenceEncoder.MODEL1),
         pdf_name)
     page_nums = search(query,  None)
     for page in page_nums:
