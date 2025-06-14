@@ -101,10 +101,11 @@ class SemanticSearchGUI:
         PDF will get hashed and if the hash does not match any known hash, then the PDF will get copied into 
         our PDF directory and the embeddings will get created.
         """
-        from main import Searcher,SentenceEncoder
-        MODEL = SentenceEncoder.MODEL1
-        EMBEDDINGS_DIR = Path(__file__).parent.parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
+        
         filepath = filedialog.askopenfilename(title='Select a PDF file', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
+        from main import Corpus,Constants
+        MODEL = Constants.MODEL1
+        EMBEDDINGS_DIR = Path(__file__).parent.parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
         if filepath:
             reader = pypdf.PdfReader(filepath)
             corpus = Corpus([page.extract_text() for page in reader.pages])
@@ -155,11 +156,11 @@ class SemanticSearchGUI:
         A new frame is shown and the user is given a button which, 
         when pressed, presents an entry field for the user to enter a search query. 
         """
-        query_frame = ttk.Frame(self.main_window)
-        query_frame.pack(side=tk.BOTTOM,pady=50)
+        self.query_frame = ttk.Frame(self.main_window)
+        self.query_frame.pack(side=tk.BOTTOM,pady=50)
         entry_text=tk.StringVar()
-        query_entry_field = ttk.Entry(query_frame,textvariable=entry_text)
-        query_entry_instructions = ttk.Label(query_frame,text="Enter query:")
+        query_entry_field = ttk.Entry(self.query_frame,textvariable=entry_text)
+        query_entry_instructions = ttk.Label(self.query_frame,text="Enter query:")
         query_entry_instructions.pack(side=tk.LEFT,padx=20)
         query_entry_field.bind("<Return>", lambda event: self.handle_enter_query(entry_text.get()))
         query_entry_field.pack(side=tk.BOTTOM)

@@ -30,7 +30,9 @@ class AbstractModel(ABC):
     def rerank(self, query : str, unordered_texts: list[str], current_scores : Tensor, rerank_count : int) -> list[int]:
         raise NotImplementedError("Not implemented")
 
-
+class Constants():
+    MODEL1 = "all-MiniLM-L6-v2" # seems good
+    MODEL2 = "all-mpnet-base-v2" # too slow, bad performance
 class SentenceEncoder(AbstractModel):
 
     MODEL1 = "all-MiniLM-L6-v2" # seems good
