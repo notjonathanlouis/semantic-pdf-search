@@ -1,19 +1,18 @@
-from main import *
 import tkinter as tk
 from typing import Optional
-from tkinter import ttk
+import ttkbootstrap as ttk
 from tkinter import filedialog
 import os
+import shutil
 from pathlib import Path
 import webbrowser
-
+import pypdf
 PDFS_DIR = Path(__file__).parent.parent / Path("pdfs")
 
 
+
+
 class SemanticSearchGUI:
-    
-
-
     def __init__(self):
         self.state = self.load_state()
         if self.state == None:
@@ -21,7 +20,8 @@ class SemanticSearchGUI:
         else:
             self.pdfs = self.get_stored_pdfs()
         self.main_window=tk.Tk()
-        ttk.Style().theme_use('clam')
+        ttk.Style().theme_use('minty')
+        self.query_frame = ttk.Frame(self.main_window)
         self.queries_results_frame=ttk.Frame(self.main_window)
         
         self.populate_file_dialogue()
@@ -63,15 +63,33 @@ class SemanticSearchGUI:
                     query_result.pack(side=tk.LEFT)
             self.queries_results_frame.pack()  
     def load_known_pdf(self,pdf_path:str)-> None:
+        self.queries_results_frame.destroy()
+        self.queries_results_frame=ttk.Frame(self.main_window)
+        self.query_frame.destroy()
+        progress_bar= ttk.Progressbar(self.main_window,orient="horizontal",mode="determinate")
+        progress_bar.pack(padx=20,pady=100,fill='x',anchor='center')
+        progress_bar.step(5)
+        progress_bar.update()
+        from main import Searcher,SentenceEncoder
+        MODEL = SentenceEncoder.MODEL1
+        progress_bar.step(15)
+        progress_bar.update()
         self.current_pdf_path=pdf_path
+        progress_bar.step(5)
+        progress_bar.update()
         self.get_previous_queries(pdf_path)
+        progress_bar.step(10)
+        progress_bar.update()
         self.search = Searcher.forPDF(
         SentenceEncoder(
-            SentenceEncoder.MODEL1),
+            MODEL),
         pdf_path)
+        progress_bar.step(40)
+        progress_bar.update()
         self.main_window.title(f"Semantic search: {Path(pdf_path).name}")
         self.menubar.delete(2)
         self.menubar.add_command(label=f"Current PDF: {Path(pdf_path).name}")
+        progress_bar.destroy()
         self.present_query_entry_field()
         ...
     def browse_for_pdf(self)-> None:
@@ -83,10 +101,25 @@ class SemanticSearchGUI:
         PDF will get hashed and if the hash does not match any known hash, then the PDF will get copied into 
         our PDF directory and the embeddings will get created.
         """
+        from main import Searcher,SentenceEncoder
+        MODEL = SentenceEncoder.MODEL1
+        EMBEDDINGS_DIR = Path(__file__).parent.parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
         filepath = filedialog.askopenfilename(title='Select a PDF file', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
         if filepath:
-            ...
-        ...
+            reader = pypdf.PdfReader(filepath)
+            corpus = Corpus([page.extract_text() for page in reader.pages])
+            corpus_hash=corpus.__hash__
+            embedding = (EMBEDDINGS_DIR / Path(str(corpus_hash)))
+            if embedding not in  EMBEDDINGS_DIR.iterdir():
+                if(Path(filepath) not in PDFS_DIR.iterdir()):
+                    new_path = PDFS_DIR / Path(filepath).name
+                    shutil.copy(filepath,PDFS_DIR)
+                    self.load_known_pdf(str(new_path))
+                else:
+                    new_path = PDFS_DIR / Path(f"{Path(filepath).name}_")
+                    shutil.copy(filepath,new_path)
+                    self.load_known_pdf(str(new_path))
+
 
 
     def open_pdf(self, pdf_path: str, page : int)-> None:
@@ -126,8 +159,8 @@ class SemanticSearchGUI:
         query_frame.pack(side=tk.BOTTOM,pady=50)
         entry_text=tk.StringVar()
         query_entry_field = ttk.Entry(query_frame,textvariable=entry_text)
-        query_entry_instructions = ttk.Label(query_frame,text="Type query and press enter!")
-        query_entry_instructions.pack(side=tk.LEFT,padx=10)
+        query_entry_instructions = ttk.Label(query_frame,text="Enter query:")
+        query_entry_instructions.pack(side=tk.LEFT,padx=20)
         query_entry_field.bind("<Return>", lambda event: self.handle_enter_query(entry_text.get()))
         query_entry_field.pack(side=tk.BOTTOM)
 
@@ -166,8 +199,8 @@ class SemanticSearchGUI:
         query_results.grid(column=1,row=0,sticky=tk.EW,padx=10,pady=10)
         for j,result in enumerate(results):
             #add result as button 
-            query_result = ttk.Button(query_results,text=str(result), command = lambda result=result: self.open_pdf(self.current_pdf_path, result))
-            query_result.pack(side=tk.LEFT)
+            query_result = ttk.Button(query_results,text=str(result), command = lambda result=result: self.open_pdf(self.current_pdf_path, result), style='Accent.TButton', padding=0)
+            query_result.pack(side=tk.RIGHT)
         self.queries_results_frame.pack()
 
 

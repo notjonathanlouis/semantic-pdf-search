@@ -15,7 +15,8 @@ logger.setLevel(logging.NOTSET)
 
 
 def get_ranks(scores : Tensor, top_k : Optional[int] = None) -> list[int]:
-    return torch.sort(scores, descending=True)[1][:top_k].tolist()
+    ret = torch.sort(scores, descending=True)[1][:top_k].tolist()
+    return [r+1 for r in ret]
 class AbstractModel(ABC):
 
     def __call__(self, text : str) -> Tensor: ...
@@ -74,7 +75,7 @@ class RerankingEncoder(SentenceEncoder):
         min_val = max_val - 10
         steps = len(unordered_texts) - rerank_count
         res = torch.cat([res, torch.linspace(max_val, min_val, steps, device = res.device)])
-        return [ordered_ranks[r] for r in get_ranks(res)]
+        return [ordered_ranks[r] +1 for r in get_ranks(res)]
 
 
 def hash_str(text : str):
