@@ -9,6 +9,10 @@ from typing import Optional
 import os
 import pickle
 import logging
+from threading import Thread
+from bert import *
+
+THREADS = 20
 
 logger = logging.getLogger("pypdf")
 logger.setLevel(logging.NOTSET)
@@ -27,7 +31,7 @@ class AbstractModel(ABC):
     def can_rerank(self) -> bool:
         return False
 
-    def rerank(self, query : str, unordered_texts: list[str], current_scores : Tensor, rerank_count : int) -> list[int]:
+    def rerank(self, query : str, unordered_texts : list[str], current_scores : Tensor, rerank_count : int) -> list[int]:
         raise NotImplementedError("Not implemented")
 
 class Constants():
@@ -40,13 +44,14 @@ class SentenceEncoder(AbstractModel):
 
     def __init__(self, model_name : str) -> None:
         self.name = model_name
-        self.model = SentenceTransformer(model_name)
-        
+        #self.model = SentenceTransformer(model_name)
+        self.model = load_checkpoint("model.pth")
+
     def __str__(self) -> str:
         return "Encoder: " + self.name
 
     def __call__(self, text : str) -> Tensor:
-        return self.model.encode(text, convert_to_tensor=True)
+        return self.model.forward(text)
 
 
 class RerankingEncoder(SentenceEncoder):
@@ -100,6 +105,7 @@ class Corpus:
     
 
 class Searcher:
+    
 
     def __init__(self, 
                  model : AbstractModel,
@@ -109,6 +115,11 @@ class Searcher:
         self.model = model
         self.corpus = corpus
         self.encodings = self.__load_embeddings(path)
+
+    def __combine_embeddings(self, encs : list[Tensor]):
+        return torch.stack([self.model(text) for text in self.corpus.texts], dim = 1)
+
+
 
     def __load_embeddings(self, path : str) -> Tensor:
         OPEN = True
@@ -121,29 +132,55 @@ class Searcher:
         file_path = f"./{dir}/{corpus_hash}"
         if OPEN and f"{corpus_hash}" in os.listdir(dir):
             with open(file_path, "rb") as f:
-                return pickle.load(f) #replace with torch.save
+                return torch.load(f) #replace with torch.save
         else:
             enc = torch.stack([self.model(text) for text in self.corpus.texts], dim = 1)
             with open(file_path, "wb") as f:
-                pickle.dump(enc, f) #replace with torch.load
+                torch.save(enc, f) #replace with torch.load
             return enc
+
+    @staticmethod
+    def __read_pages(page_list : list[pypdf.PageObject], out_list : list[str]):
+        for page in page_list:
+            out_list.append(page.extract_text())
 
     @staticmethod
     def forPDF(model : AbstractModel, path : str) -> "Searcher":
         reader = pypdf.PdfReader(path)
-        corpus = Corpus([page.extract_text() for page in reader.pages])
-        return Searcher(model, corpus)
+        #corpus = Corpus([page.extract_text() for page in reader.pages])
+        pages = reader.pages
+        page_lists = []
+        batch_size = len(pages) // THREADS
+        i = 0
+        for i in range(THREADS-1, batch_size):
+            page_lists.append(pages[i:batch_size])
+        page_lists.append(pages[i:])
+        threads : list[Thread] = []
+        out_str_lists = [[] for _ in range(THREADS)]
+        for i in range(THREADS):
+            threads.append(Thread(target = Searcher.__read_pages, args = (page_lists[i], out_str_lists[i])))
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        texts : list[str] = []
+        for out_strs in out_str_lists:
+            texts.extend(out_strs)
+        return Searcher(model, Corpus(texts))
+    
 
+    
     def __call__(self, query : str, top_k : Optional[int] = 1) -> list[int]:
         """
         Searches for ``query`` in the corpus, returns the results index
         """
 
-        query_enc = torch.stack([self.model(query)] * self.encodings.shape[1], dim = 1)
-        similarities = torch.cosine_similarity(query_enc, self.encodings, dim = 0)
-        if self.model.can_rerank():
-            return self.model.rerank(query, self.corpus.texts, similarities, 20)
-        else:
-            return get_ranks(similarities,top_k)
-    
+        with torch.no_grad():
+            query_enc = torch.stack([self.model(query)] * self.encodings.shape[1], dim = 1)
+            similarities = torch.cosine_similarity(query_enc, self.encodings, dim = 0)
+            if self.model.can_rerank():
+                return self.model.rerank(query, self.corpus.texts, similarities, 20)
+            else:
+                return get_ranks(similarities,top_k)
+        
 

@@ -2,6 +2,7 @@ from main import *
 import sys
 import os
 import webbrowser
+import platform
 
 if __name__ == "__main__":
     """
@@ -22,6 +23,8 @@ if __name__ == "__main__":
             SentenceEncoder.MODEL1),
         pdf_name)
     page_nums = search(query,  None)
+    
+
     for page in page_nums:
         cmd = f"file://{os.getcwd()}/{pdf_name}#page={page}"
         print(cmd)
