@@ -173,3 +173,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 embeddings/Encoder: all-MiniLM-L6-v2
+embeddings/Encoder: all-MiniLM-L6-v2

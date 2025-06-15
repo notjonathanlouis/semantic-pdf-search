@@ -121,11 +121,11 @@ class Searcher:
         file_path = f"./{dir}/{corpus_hash}"
         if OPEN and f"{corpus_hash}" in os.listdir(dir):
             with open(file_path, "rb") as f:
-                return pickle.load(f)
+                return pickle.load(f) #replace with torch.save
         else:
             enc = torch.stack([self.model(text) for text in self.corpus.texts], dim = 1)
             with open(file_path, "wb") as f:
-                pickle.dump(enc, f)
+                pickle.dump(enc, f) #replace with torch.load
             return enc
 
     @staticmethod

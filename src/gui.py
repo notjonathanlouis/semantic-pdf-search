@@ -20,7 +20,7 @@ class SemanticSearchGUI:
         else:
             self.pdfs = self.get_stored_pdfs()
         self.main_window=tk.Tk()
-        ttk.Style().theme_use('minty')
+        ttk.Style().theme_use('sandstone')
         self.query_frame = ttk.Frame(self.main_window)
         self.queries_results_frame=ttk.Frame(self.main_window)
         
@@ -66,31 +66,40 @@ class SemanticSearchGUI:
         self.queries_results_frame.destroy()
         self.queries_results_frame=ttk.Frame(self.main_window)
         self.query_frame.destroy()
+        
         progress_bar= ttk.Progressbar(self.main_window,orient="horizontal",mode="determinate")
-        progress_bar.pack(padx=20,pady=100,fill='x',anchor='center')
+        progress_bar.pack(side=tk.BOTTOM,padx=20,pady=20,fill='x',anchor='center')
+        progress_text= ttk.Label(self.main_window,text="Importing Libraries")
+        progress_text.pack(side=tk.BOTTOM)
         progress_bar.step(5)
-        progress_bar.update()
+        self.main_window.update()
         from main import Searcher,SentenceEncoder
         MODEL = SentenceEncoder.MODEL1
+        
         progress_bar.step(15)
-        progress_bar.update()
+        self.main_window.update()
         self.current_pdf_path=pdf_path
+        progress_text.configure(text="Loading Previous Queries")
         progress_bar.step(5)
-        progress_bar.update()
+        self.main_window.update()
         self.get_previous_queries(pdf_path)
         progress_bar.step(10)
-        progress_bar.update()
+        progress_text.configure(text="Loading Embeddings")
+        self.main_window.update()
         self.search = Searcher.forPDF(
         SentenceEncoder(
             MODEL),
         pdf_path)
         progress_bar.step(40)
-        progress_bar.update()
+        progress_text.configure(text="Finalizing")
+        
+        self.main_window.update()
         self.main_window.title(f"Semantic search: {Path(pdf_path).name}")
         self.menubar.delete(2)
         self.menubar.add_command(label=f"Current PDF: {Path(pdf_path).name}")
         progress_bar.destroy()
-        self.present_query_entry_field()
+        self.show_search_bar()
+        progress_text.destroy()
         ...
     def browse_for_pdf(self)-> None:
         """
@@ -151,7 +160,7 @@ class SemanticSearchGUI:
         ...
 
     
-    def present_query_entry_field(self)->None:
+    def show_search_bar(self)->None:
         """
         A new frame is shown and the user is given a button which, 
         when pressed, presents an entry field for the user to enter a search query. 
@@ -178,12 +187,7 @@ class SemanticSearchGUI:
         self.get_previous_queries(self.current_pdf_path)
         ...
     
-    def display_search_bar(self)->None:
-        """
-        A search progress bar is shown, increasing in progress as the number of 
-        pages searched increases. 
-        """
-        ...
+
 
     def display_results(self,query:str, results: list[int])->None:
         """
@@ -193,11 +197,13 @@ class SemanticSearchGUI:
         """
         #add new row to grid here
         self.queries_results_frame.rowconfigure(0,weight=1)
+        self.queries_results_frame.columnconfigure(1, weight=3)
         #add query as Label here
-        query_label = ttk.Label(self.queries_results_frame,text=query)
-        query_label.grid(column=0,row=0,sticky=tk.EW,padx=10,pady=10)
+        query_label = ttk.Label(self.queries_results_frame, text=query)        
+        query_label.grid(column=0, row=0, sticky=tk.EW, padx=10, pady=10)
         query_results=ttk.Frame(self.queries_results_frame)
-        query_results.grid(column=1,row=0,sticky=tk.EW,padx=10,pady=10)
+        query_results.grid(column=1, row=0, sticky=tk.EW, padx=10, pady=10)
+
         for j,result in enumerate(results):
             #add result as button 
             query_result = ttk.Button(query_results,text=str(result), command = lambda result=result: self.open_pdf(self.current_pdf_path, result), style='Accent.TButton', padding=0)
