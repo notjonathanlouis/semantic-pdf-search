@@ -44,14 +44,14 @@ class SentenceEncoder(AbstractModel):
 
     def __init__(self, model_name : str) -> None:
         self.name = model_name
-        #self.model = SentenceTransformer(model_name)
-        self.model = load_checkpoint("model.pth")
+        self.model = SentenceTransformer(model_name)
+        #self.model = load_checkpoint("model.pth")
 
     def __str__(self) -> str:
         return "Encoder: " + self.name
 
     def __call__(self, text : str) -> Tensor:
-        return self.model.forward(text)
+        return self.model.encode(text, convert_to_tensor=True)
 
 
 class RerankingEncoder(SentenceEncoder):
@@ -147,17 +147,16 @@ class Searcher:
     @staticmethod
     def forPDF(model : AbstractModel, path : str) -> "Searcher":
         reader = pypdf.PdfReader(path)
-        #corpus = Corpus([page.extract_text() for page in reader.pages])
         pages = reader.pages
         page_lists = []
         batch_size = len(pages) // THREADS
         i = 0
-        for i in range(THREADS-1, batch_size):
-            page_lists.append(pages[i:batch_size])
+        for i in range(0,len(pages)-batch_size, batch_size):
+            page_lists.append(pages[i:(i+batch_size)])
         page_lists.append(pages[i:])
         threads : list[Thread] = []
         out_str_lists = [[] for _ in range(THREADS)]
-        for i in range(THREADS):
+        for i in range(0,THREADS):
             threads.append(Thread(target = Searcher.__read_pages, args = (page_lists[i], out_str_lists[i])))
         for t in threads:
             t.start()
