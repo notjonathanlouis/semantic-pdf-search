@@ -6,7 +6,7 @@ import os
 import shutil
 from pathlib import Path
 import webbrowser
-import pypdf
+import pymupdf
 PDFS_DIR = Path(__file__).parent.parent / Path("pdfs")
 
 
@@ -88,8 +88,7 @@ class SemanticSearchGUI:
         self.main_window.update()
         self.search = Searcher.forPDF(
         SentenceEncoder(
-            MODEL),
-        pdf_path)
+            MODEL),pdf_path)
         progress_bar.step(40)
         progress_text.configure(text="Finalizing")
         
@@ -116,8 +115,9 @@ class SemanticSearchGUI:
         MODEL = Constants.MODEL1
         EMBEDDINGS_DIR = Path(__file__).parent.parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
         if filepath:
-            reader = pypdf.PdfReader(filepath)
-            corpus = Corpus([page.extract_text() for page in reader.pages])
+            reader = pymupdf.open(filepath)
+            pages = [reader.load_page(i) for i in range(len(reader))]
+            corpus = Corpus([page.get_text() for page in pages])
             corpus_hash=corpus.__hash__
             embedding = (EMBEDDINGS_DIR / Path(str(corpus_hash)))
             if embedding not in  EMBEDDINGS_DIR.iterdir():
@@ -129,7 +129,7 @@ class SemanticSearchGUI:
                     new_path = PDFS_DIR / Path(f"{Path(filepath).name}_")
                     shutil.copy(filepath,new_path)
                     self.load_known_pdf(str(new_path))
-
+            reader.close()
 
 
     def open_pdf(self, pdf_path: str, page : int)-> None:

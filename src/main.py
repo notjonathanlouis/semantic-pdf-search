@@ -4,7 +4,7 @@ from torch import Tensor
 import torch
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from abc import ABC
-import pypdf
+import pymupdf
 from typing import Optional
 import os
 import pickle
@@ -12,7 +12,7 @@ import logging
 from threading import Thread
 from bert import *
 
-THREADS = 20
+THREADS = os.cpu_count()
 
 logger = logging.getLogger("pypdf")
 logger.setLevel(logging.NOTSET)
@@ -140,14 +140,14 @@ class Searcher:
             return enc
 
     @staticmethod
-    def __read_pages(page_list : list[pypdf.PageObject], out_list : list[str]):
+    def __read_pages(page_list : list[pymupdf.Page], out_list : list[str]):
         for page in page_list:
-            out_list.append(page.extract_text())
+            out_list.append(page.get_text())
 
     @staticmethod
     def forPDF(model : AbstractModel, path : str) -> "Searcher":
-        reader = pypdf.PdfReader(path)
-        pages = reader.pages
+        reader = pymupdf.open(path)
+        pages = [reader.load_page(i) for i in range(len(reader))]
         page_lists = []
         batch_size = len(pages) // THREADS
         i = 0
@@ -165,6 +165,7 @@ class Searcher:
         texts : list[str] = []
         for out_strs in out_str_lists:
             texts.extend(out_strs)
+        reader.close()
         return Searcher(model, Corpus(texts))
     
 
