@@ -7,11 +7,15 @@ import shutil
 from pathlib import Path
 import webbrowser
 import pymupdf
+from threading import Thread
+
 PDFS_DIR = Path(__file__).parent.parent / Path("pdfs")
 
 
 
 
+
+ 
 class SemanticSearchGUI:
     def __init__(self):
         self.state = self.load_state()
@@ -21,16 +25,19 @@ class SemanticSearchGUI:
             self.pdfs = self.get_stored_pdfs()
         self.main_window=tk.Tk()
         ttk.Style().theme_use('sandstone')
+        self.import_thread:Thread=Thread(target = self.import_from_main)
+        self.import_thread.start()
         self.query_frame = ttk.Frame(self.main_window)
         self.queries_results_frame=ttk.Frame(self.main_window)
         
         self.populate_file_dialogue()
         
-            
+    def import_from_main(self)->None:
+        global Searcher,SentenceEncoder
+        from main import Searcher,SentenceEncoder
+
     def get_stored_pdfs(self) -> list[str]: 
         return [str(child) for child in PDFS_DIR.iterdir()]
-        
-
         
     def populate_file_dialogue(self) -> None:
         self.menubar=tk.Menu(self.main_window)
@@ -73,9 +80,10 @@ class SemanticSearchGUI:
         progress_text.pack(side=tk.BOTTOM)
         progress_bar.step(5)
         self.main_window.update()
-        from main import Searcher,SentenceEncoder
+        if self.import_thread.is_alive():
+            self.import_thread.join()
+
         MODEL = SentenceEncoder.MODEL1
-        
         progress_bar.step(15)
         self.main_window.update()
         self.current_pdf_path=pdf_path

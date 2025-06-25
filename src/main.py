@@ -10,7 +10,7 @@ import os
 import pickle
 import logging
 from threading import Thread
-from bert import *
+#from bert import *
 
 THREADS = os.cpu_count()
 
@@ -118,8 +118,6 @@ class Searcher:
 
     def __combine_embeddings(self, encs : list[Tensor]):
         return torch.stack([self.model(text) for text in self.corpus.texts], dim = 1)
-
-
 
     def __load_embeddings(self, path : str) -> Tensor:
         OPEN = True
