@@ -7,7 +7,6 @@ from abc import ABC
 import pymupdf
 from typing import Optional
 import os
-import pickle
 import logging
 from threading import Thread
 #from bert import *
@@ -120,7 +119,6 @@ class Searcher:
         return torch.stack([self.model(text) for text in self.corpus.texts], dim = 1)
 
     def __load_embeddings(self, path : str) -> Tensor:
-        OPEN = True
         if path not in os.listdir("."):
             os.mkdir(f"./{path}")
         dir = f"./{path}/{self.model.encoder_name()}"
@@ -128,7 +126,7 @@ class Searcher:
             os.mkdir(dir)
         corpus_hash = hash(self.corpus)
         file_path = f"./{dir}/{corpus_hash}"
-        if OPEN and f"{corpus_hash}" in os.listdir(dir):
+        if f"{corpus_hash}" in os.listdir(dir):
             with open(file_path, "rb") as f:
                 return torch.load(f) #replace with torch.save
         else:

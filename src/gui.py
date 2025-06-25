@@ -8,6 +8,7 @@ from pathlib import Path
 import webbrowser
 import pymupdf
 from threading import Thread
+import pickle
 
 PDFS_DIR = Path(__file__).parent.parent / Path("pdfs")
 
@@ -24,6 +25,7 @@ class SemanticSearchGUI:
         else:
             self.pdfs = self.get_stored_pdfs()
         self.main_window=tk.Tk()
+        self.main_window.protocol("WM_DELETE_WINDOW", self.save_state_and_close)
         ttk.Style().theme_use('sandstone')
         self.import_thread:Thread=Thread(target = self.import_from_main)
         self.import_thread.start()
@@ -32,6 +34,7 @@ class SemanticSearchGUI:
         
         self.populate_file_dialogue()
         
+
     def import_from_main(self)->None:
         global Searcher,SentenceEncoder
         from main import Searcher,SentenceEncoder
@@ -60,15 +63,29 @@ class SemanticSearchGUI:
                 #add new row to grid here
                 self.queries_results_frame.rowconfigure(i,weight=1)
                 #add query as Label here
-                query_label = ttk.Label(self.queries_results_frame,text=query)
-                query_label.grid(column=0,row=i,sticky=tk.EW,padx=10,pady=10)
+                query_label = ttk.Label(self.queries_results_frame, text=query)        
+                query_label.grid(column=0, row=i, sticky=tk.EW, padx=10, pady=10)
                 query_results=ttk.Frame(self.queries_results_frame)
-                query_results.grid(column=1,row=i,sticky=tk.EW,padx=10,pady=10)
-                for j,result in enumerate(self.state[pdf_path][query]):
+                query_results.grid(column=1, row=i, sticky=tk.EW, padx=10, pady=10)
+                for result in self.state[pdf_path][query]:
                     #add result as button 
                     query_result = ttk.Button(query_results,text=str(result), command = lambda pdf_path=pdf_path,result=result: self.open_pdf(pdf_path, result))
                     query_result.pack(side=tk.LEFT)
+                delete_query_button=ttk.Button(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
+                delete_query_button.pack(side=tk.LEFT)
             self.queries_results_frame.pack()  
+    def remove_query_result(self,query:str)->None:
+
+        if self.state != None:
+            if self.current_pdf_path in self.state:
+                if query in self.state[self.current_pdf_path]:
+                    del self.state[self.current_pdf_path][query]
+        self.queries_results_frame.destroy()
+        self.queries_results_frame=ttk.Frame(self.main_window)
+        self.query_frame.destroy()
+        self.get_previous_queries(self.current_pdf_path)
+        self.show_search_bar()
+
     def load_known_pdf(self,pdf_path:str)-> None:
         self.queries_results_frame.destroy()
         self.queries_results_frame=ttk.Frame(self.main_window)
@@ -207,15 +224,18 @@ class SemanticSearchGUI:
         self.queries_results_frame.rowconfigure(0,weight=1)
         self.queries_results_frame.columnconfigure(1, weight=3)
         #add query as Label here
+        
         query_label = ttk.Label(self.queries_results_frame, text=query)        
         query_label.grid(column=0, row=0, sticky=tk.EW, padx=10, pady=10)
         query_results=ttk.Frame(self.queries_results_frame)
         query_results.grid(column=1, row=0, sticky=tk.EW, padx=10, pady=10)
 
-        for j,result in enumerate(results):
+        for result in results:
             #add result as button 
             query_result = ttk.Button(query_results,text=str(result), command = lambda result=result: self.open_pdf(self.current_pdf_path, result), style='Accent.TButton', padding=0)
             query_result.pack(side=tk.RIGHT)
+        delete_query_button=ttk.Button(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
+        delete_query_button.pack(side=tk.LEFT)
         self.queries_results_frame.pack()
 
 
@@ -225,18 +245,32 @@ class SemanticSearchGUI:
     # (satisfied by `spawn_new_query_entry`)
     # """
 
-    def save_state(self)-> None:
+    def save_state_and_close(self)-> None:
         """
         The query, the PDF hash, and all the results will be stored to a 
         pickle dictionary file. 
         """
-        
+        print("here")
+        directory=Path(__file__).parent.parent
+        file=Path("state.pck")
+        with open(directory / file, "wb") as f:
+            pickle.dump(file=f,obj=self.state)
+        self.main_window.destroy()
     def load_state(self) -> Optional[dict[str, dict[str, list[int]]]]:
         """
         Load state from pickle file and returns a dictionary representation. If there is no saved state, 
         returns None.
         """
-        state=dict[str,dict[str,list[int]]]()
+        state:dict[str,dict[str,list[int]]];
+
+        directory=Path(__file__).parent.parent
+        file=Path("state.pck")
+        if f"{file}" in os.listdir(directory):
+            with open(directory / file, "rb") as f:
+                state=pickle.load(file=f)
+        else:
+            state=dict[str,dict[str,list[int]]]()
+
         return state
 
 
