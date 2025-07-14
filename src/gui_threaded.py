@@ -11,12 +11,17 @@ from threading import Thread
 import pickle
 
 PDFS_DIR = Path(__file__).parent.parent / Path("pdfs")
-
 os.environ["HF_HUB_OFFLINE"]="1"
 
+STATE_PROGRESSBAR_UPDATE = 0x01
 
+"""
+    output: list[int] progress
 
+    requests progress update from class while doing operation
 
+    for:
+"""
  
 class SemanticSearchGUI:
     def __init__(self):
@@ -38,7 +43,7 @@ class SemanticSearchGUI:
 
     def import_from_main(self)->None:
         global Searcher,SentenceEncoder
-        from main import Searcher,SentenceEncoder
+        from main_threaded import Searcher,SentenceEncoder
 
     def get_stored_pdfs(self) -> list[str]: 
         return [str(child) for child in PDFS_DIR.iterdir()]
@@ -87,12 +92,24 @@ class SemanticSearchGUI:
         self.get_previous_queries(self.current_pdf_path)
         self.show_search_bar()
 
+    # def show_progress(self,progress_list:list[tk.IntVar],progress_bar:ttk.Progressbar):
+    #     progress:float=0
+    #     while progress<1:
+    #         progress=progress_list[0]
+    #         progress_bar["value"] = (progress*100)
+    #         progress_bar.update()
+
+            #print(*progress_list)
+            
+
+        
+
     def load_known_pdf(self,pdf_path:str)-> None:
         self.queries_results_frame.destroy()
         self.queries_results_frame=ttk.Frame(self.main_window)
         self.query_frame.destroy()
-        
-        progress_bar= ttk.Progressbar(self.main_window,orient="horizontal",mode="determinate")
+        progress = tk.IntVar()
+        progress_bar= ttk.Progressbar(self.main_window,variable=progress,orient="horizontal",mode="determinate")
         progress_bar.pack(side=tk.BOTTOM,padx=20,pady=20,fill='x',anchor='center')
         progress_text= ttk.Label(self.main_window,text="Importing Libraries")
         progress_text.pack(side=tk.BOTTOM)
@@ -112,16 +129,20 @@ class SemanticSearchGUI:
         progress_bar.step(10)
         progress_text.configure(text="Loading Embeddings")
         self.main_window.update()
+        
+        # progress_list:list[int]=[progress]
+        #progress_thread=Thread(target = self.show_progress, args = (progress_list,progress_bar));
+        print("before search")
+        #progress_thread.start()
         self.search = Searcher.forPDF(
         SentenceEncoder(
-            MODEL),pdf_path)
-        progress_bar.step(40)
-        progress_text.configure(text="Finalizing")
+            MODEL),pdf_path,out_progress_list=progress)
+        print("after search")
         
-        self.main_window.update()
         self.main_window.title(f"Semantic search: {Path(pdf_path).name}")
         self.menubar.delete(2)
         self.menubar.add_command(label=f"Current PDF: {Path(pdf_path).name}")
+        
         progress_bar.destroy()
         self.show_search_bar()
         progress_text.destroy()
@@ -137,7 +158,7 @@ class SemanticSearchGUI:
         """
         
         filepath = filedialog.askopenfilename(title='Select a PDF file', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
-        from main import Corpus,Constants
+        from main_threaded import Corpus,Constants
         MODEL = Constants.MODEL1
         EMBEDDINGS_DIR = Path(__file__).parent.parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
         if filepath:

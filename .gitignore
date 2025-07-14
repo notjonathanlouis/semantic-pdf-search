@@ -174,3 +174,5 @@ cython_debug/
 .pypirc
 embeddings/Encoder: all-MiniLM-L6-v2
 embeddings/Encoder: all-MiniLM-L6-v2
+state.pck
+pdfs
