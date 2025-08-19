@@ -176,3 +176,11 @@ embeddings/Encoder: all-MiniLM-L6-v2
 embeddings/Encoder: all-MiniLM-L6-v2
 state.pck
 pdfs
+
+# Ignore embeddings and pdfs directories
+semantic-pdf-search/embeddings/
+semantic-pdf-search/pdfs/
+
+# Ignore Python compiled bytecode in any directory
+__pycache__/
+*.pyc
