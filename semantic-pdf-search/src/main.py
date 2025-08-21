@@ -18,10 +18,15 @@ logger.setLevel(logging.NOTSET)
 
 
 def get_ranks(scores : Tensor, top_k : Optional[int] = None) -> list[int]:
+    """
+    Sort the incoming tensor of page scores and then return the top k page numbers.
+    """
     ret = torch.sort(scores, descending=True)[1][:top_k].tolist()
     return [r+1 for r in ret]
 class AbstractModel(ABC):
-
+    """
+    Abstract base class for models.
+    """
     def __call__(self, text : str) -> Tensor: ...
 
     def encoder_name(self) -> str:
@@ -34,10 +39,15 @@ class AbstractModel(ABC):
         raise NotImplementedError("Not implemented")
 
 class Constants():
+    """
+    Isolated list of constants for model selection
+    """
     MODEL1 = "all-MiniLM-L6-v2" # seems good
     MODEL2 = "all-mpnet-base-v2" # too slow, bad performance
 class SentenceEncoder(AbstractModel):
-
+    """
+    Sentence Encoder base class.
+    """
     MODEL1 = "all-MiniLM-L6-v2" # seems good
     MODEL2 = "all-mpnet-base-v2" # too slow, bad performance
 
@@ -54,7 +64,11 @@ class SentenceEncoder(AbstractModel):
 
 
 class RerankingEncoder(SentenceEncoder):
+    """
+    Reranking Encoder class. 
 
+    This class contains the necessary functions to rerank a list of ranked pages using a reranking cross encoder model.
+    """
     MODEL1 = "cross-encoder/ms-marco-TinyBERT-L2-v2"
 
     def __init__(self, embedder_name : str, reranker_name : str) -> None:
@@ -72,6 +86,9 @@ class RerankingEncoder(SentenceEncoder):
         return True
     
     def rerank(self, query : str, unordered_texts: list[str], current_scores : Tensor, rerank_count : int) -> list[int]:
+        """
+            This function takes the ranked pages from a Searcher and reranks them, returning the ordered list of page ranks.
+        """
         ranks = get_ranks(current_scores, top_k = None)
         ordered_texts = [unordered_texts[r] for r in ranks]
         ordered_ranks = [r for r in ranks]
@@ -85,6 +102,9 @@ class RerankingEncoder(SentenceEncoder):
 
 
 def hash_str(text : str):
+    """
+    Simple deterministic hash function.
+    """
     h = 5381
     r = 0xFFFFFFFFFFFFFFFF
     for c in text:
@@ -92,7 +112,9 @@ def hash_str(text : str):
     return h
 
 class Corpus:
-
+    """
+    This class contains all the necessary functions to store and retrieve PDF page texts.
+    """
     def __init__(self, texts : list[str]):
         self.texts = texts
 
@@ -104,21 +126,29 @@ class Corpus:
     
 
 class Searcher:
-    
+    """
+    This class contains all the necessary methods to search for a query in a PDF. 
+    """
 
     def __init__(self, 
                  model : AbstractModel,
                  corpus : Corpus,
-                 path : str = "embeddings"):
-        
+                 path : str = "embeddings"):        
         self.model = model
         self.corpus = corpus
         self.encodings = self.__load_embeddings(path)
 
-    def __combine_embeddings(self, encs : list[Tensor]):
+    def __encode_corpus(self):
+        """
+        Performs vector embedding on all texts in a corpus and return the result.
+        """
         return torch.stack([self.model(text) for text in self.corpus.texts], dim = 1)
 
     def __load_embeddings(self, path : str) -> Tensor:
+        """
+        Check if PDF has already been embedded. If so, load the embedding from the file and return it, otherwise create an embedding file for this PDF
+        and then encodes all text in the corpus and saves the result to the embedding file, finally returning the embedding.
+        """
         if path not in os.listdir("."):
             os.mkdir(f"./{path}")
         dir = f"./{path}/{self.model.encoder_name()}"
@@ -128,20 +158,26 @@ class Searcher:
         file_path = f"./{dir}/{corpus_hash}"
         if f"{corpus_hash}" in os.listdir(dir):
             with open(file_path, "rb") as f:
-                return torch.load(f) #replace with torch.save
+                return torch.load(f)
         else:
-            enc = torch.stack([self.model(text) for text in self.corpus.texts], dim = 1)
+            enc = self.__encode_corpus()
             with open(file_path, "wb") as f:
-                torch.save(enc, f) #replace with torch.load
+                torch.save(enc, f) 
             return enc
 
     @staticmethod
     def __read_pages(page_list : list[pymupdf.Page], out_list : list[str]):
+        """
+        Extract the text from each page and append it to the ``out_list`` reference list.
+        """
         for page in page_list:
             out_list.append(page.get_text())
 
     @staticmethod
     def forPDF(model : AbstractModel, path : str) -> "Searcher":
+        """
+        Open the PDF and encode the text using the specified model. Threaded.
+        """
         reader = pymupdf.open(path)
         pages = [reader.load_page(i) for i in range(len(reader))]
         page_lists = []

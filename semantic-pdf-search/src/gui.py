@@ -12,14 +12,45 @@ import pickle
 
 PDFS_DIR = Path(__file__).parent.parent / Path("pdfs")
 
-os.environ["HF_HUB_OFFLINE"]="1"
 
 
+
+import socket
+
+def is_connected(timeout=1):
+    """
+    If internet is not connected, set HF_HUB_OFFLINE=1. This prevents infinite loading time when offline.
+    """
+    test_hosts = [
+        ("1.1.1.1", 53),          # Cloudflare
+        ("8.8.8.8", 53),          # Google
+        ("9.9.9.9", 53),          # Quad9
+        ("208.67.222.222", 53),   # OpenDNS
+    ]
+    for host, port in test_hosts:
+        try:
+            socket.setdefaulttimeout(timeout)
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.connect((host, port))
+                return True
+        except socket.error:
+            continue
+    return False
+
+if not is_connected():
+    os.environ["HF_HUB_OFFLINE"] = "1"
 
 
  
 class SemanticSearchGUI:
+    """
+    This class contains all the necessary methods to present a working GUI to the user.
+    """
     def __init__(self):
+        """
+        Attempt to load the state file and otherwise give the instructional message. Load the filenames of previously
+          embedded PDFs, present the main window to the user, start a thread to load the sentence-encoders module.
+        """
         self.state = self.load_state()
         if self.state == None:
             self.fresh_start()
@@ -37,13 +68,22 @@ class SemanticSearchGUI:
         
 
     def import_from_main(self)->None:
+        """
+        Import the Searcher and SentenceEncoder class from main. This also loads the sentence-encoders module which can take some time. 
+        """
         global Searcher,SentenceEncoder
         from main import Searcher,SentenceEncoder
 
     def get_stored_pdfs(self) -> list[str]: 
+        """
+        Return a list of stored (previously embedded) PDFs by filename.
+        """
         return [str(child) for child in PDFS_DIR.iterdir()]
         
     def populate_file_dialogue(self) -> None:
+        """
+        Populates the file dialogue. This includes buttons to load previously embedded PDFs and one to embed a new PDF from a file dialogue.
+        """
         self.menubar=tk.Menu(self.main_window)
         submenu=tk.Menu(self.menubar,tearoff=0)
         self.main_window.config(menu=self.menubar)
@@ -56,6 +96,9 @@ class SemanticSearchGUI:
         submenu.add_command(label="Open PDF", command=self.browse_for_pdf)
     
     def get_previous_queries(self, pdf_path: str) -> None:
+        """
+        Load previous queries from state and display results to user.
+        """
         if self.state != None and pdf_path in self.state: 
             self.queries_results_frame.columnconfigure(0,weight=1)
             self.queries_results_frame.columnconfigure(1,weight=1)
@@ -75,8 +118,11 @@ class SemanticSearchGUI:
                 delete_query_button=ttk.Button(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
                 delete_query_button.pack(side=tk.LEFT)
             self.queries_results_frame.pack()  
-    def remove_query_result(self,query:str)->None:
 
+    def remove_query_result(self,query:str)->None:
+        """
+        Removes a query and its result from the list.
+        """
         if self.state != None:
             if self.current_pdf_path in self.state:
                 if query in self.state[self.current_pdf_path]:
@@ -88,6 +134,14 @@ class SemanticSearchGUI:
         self.show_search_bar()
 
     def load_known_pdf(self,pdf_path:str)-> None:
+        """
+        Load a known PDF and display previous queries. Also sets the window title. 
+        Loading a PDF can take a while even if the embedding file exists because of the import time for the sentence-transformers package
+        and the time taken to run torch.load(). Note that a PDF being 'known' only means that the PDF file is in the `pdfs` folder. 
+        
+        Originally there were supposed to be two functions depending on if the embedding file existed for that PDF but they would be 
+        largely identical because the call to ``Searcher.forPDF()`` handles this case internally. 
+        """
         self.queries_results_frame.destroy()
         self.queries_results_frame=ttk.Frame(self.main_window)
         self.query_frame.destroy()
@@ -128,12 +182,9 @@ class SemanticSearchGUI:
         ...
     def browse_for_pdf(self)-> None:
         """
-        +++++++++++++Open pdf+++++++++++
-        User browses for and selects PDF. 
-
-        This function will open the file dialog, and allow the user to select a PDF. The selected
-        PDF will get hashed and if the hash does not match any known hash, then the PDF will get copied into 
-        our PDF directory and the embeddings will get created.
+        This function opens the file dialog and allows the user to select a PDF. The selected
+        PDF will get hashed and if the hash does not match any known hash, the PDF will get copied into 
+        the `pdfs` directory and the embeddings will be created.
         """
         
         filepath = filedialog.askopenfilename(title='Select a PDF file', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
@@ -166,23 +217,11 @@ class SemanticSearchGUI:
 
     def fresh_start(self)-> None:
         """
-        +++++++++++++Fresh start++++++++
         User opens app, told to select Open ... -> Browse for PDF
         """
         intro = ttk.Label(self.queries_results_frame, text="To start a search, first select a PDF. \n " \
         "Click on Open ... -> Browse for PDF.")
         intro.grid(column=1,row=1)
-        ...
-    
-    
-    
-    def store_pdf(self)->None:
-        """
-        It is copied into a set location to store PDFs used by this app. 
-        If a file with the same name already exists, the two file 
-        hashes will be compared and the incoming file will get a numeric 
-        subscript to denote that the two files are distinct. 
-        """
         ...
 
     
@@ -202,8 +241,7 @@ class SemanticSearchGUI:
 
     def handle_enter_query(self, entry:str )->None:
         """
-        ++++++++++++++Enter query++++++++++
-        The user enters a search query and taps enter. 
+        The query is searched for and the results are displayed to the user. The results are also stored to the state.
         """
         if self.state != None:
             if self.current_pdf_path not in self.state:
@@ -239,19 +277,11 @@ class SemanticSearchGUI:
         delete_query_button.pack(side=tk.LEFT)
         self.queries_results_frame.pack()
 
-
-    # """
-    # The user is given a button which, when pressed, presents an entry field for the 
-    # user to enter a search query. 
-    # (satisfied by `spawn_new_query_entry`)
-    # """
-
     def save_state_and_close(self)-> None:
         """
-        The query, the PDF hash, and all the results will be stored to a 
+        The query, the PDF hash, and all the results are stored to a 
         pickle dictionary file. 
         """
-        print("here")
         directory=Path(__file__).parent.parent
         file=Path("state.pck")
         with open(directory / file, "wb") as f:
@@ -259,7 +289,7 @@ class SemanticSearchGUI:
         self.main_window.destroy()
     def load_state(self) -> Optional[dict[str, dict[str, list[int]]]]:
         """
-        Load state from pickle file and returns a dictionary representation. If there is no saved state, 
+        Loads state from pickle file and returns a dictionary representation. If there is no saved state, 
         returns None.
         """
         state:dict[str,dict[str,list[int]]];
