@@ -70,13 +70,17 @@ class SemanticSearchGUI:
         Import the Searcher and SentenceEncoder class from main. This also loads the sentence-encoders module which can take some time. 
         """
         global Searcher,SentenceEncoder
-        from main import Searcher,SentenceEncoder
+        from semantic_pdf_search.main import Searcher,SentenceEncoder
 
     def get_stored_pdfs(self) -> list[str]: 
         """
         Return a list of stored (previously embedded) PDFs by filename.
         """
+        if not os.path.isdir(PDFS_DIR):
+            os.mkdir(PDFS_DIR)
         return [str(child) for child in PDFS_DIR.iterdir()]
+        
+
         
     def populate_file_dialogue(self) -> None:
         """
@@ -185,10 +189,14 @@ class SemanticSearchGUI:
         the `pdfs` directory and the embeddings will be created.
         """
         
-        filepath = filedialog.askopenfilename(title='Select a PDF file', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
-        from main import Corpus,Constants
+        filepath = filedialog.askopenfilename(title='Select a PDF', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
+        from semantic_pdf_search.main import Corpus,Constants
         MODEL = Constants.MODEL1
         EMBEDDINGS_DIR = Path(__file__).parent.parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
+        if not os.path.isdir(EMBEDDINGS_DIR.parent):
+            os.mkdir(EMBEDDINGS_DIR.parent)
+        if not os.path.isdir(EMBEDDINGS_DIR):
+            os.mkdir(EMBEDDINGS_DIR)
         if filepath:
             reader = pymupdf.open(filepath)
             pages = [reader.load_page(i) for i in range(len(reader))]
