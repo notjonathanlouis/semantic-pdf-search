@@ -37,8 +37,6 @@ def is_connected(timeout=1):
             continue
     return False
 
-if not is_connected():
-    os.environ["HF_HUB_OFFLINE"] = "1"
 
 
  
@@ -304,8 +302,8 @@ class SemanticSearchGUI:
 
         return state
 
-
-
-gui = SemanticSearchGUI()
-gui.main_window.mainloop()
-#print(gui.get_stored_pdfs())
+def main():
+    if not is_connected():
+        os.environ["HF_HUB_OFFLINE"] = "1"
+    gui = SemanticSearchGUI()
+    gui.main_window.mainloop()

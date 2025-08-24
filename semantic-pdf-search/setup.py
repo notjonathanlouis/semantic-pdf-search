@@ -8,12 +8,14 @@ setup(
 	packages=find_packages(),
 	python_requires='>=3.6',
 	install_requires=[
-		"tkinter",
 		"ttkbootstrap",
         "pymupdf",
-        "webbrowser",  
-        "pickle",  
         "torch",
         "sentence-transformers",  
     ],
+    entry_points={
+        'gui_scripts': [
+            'semantic-pdf-search=gui:main'
+		]
+	}
 )
