@@ -1,7 +1,6 @@
+import customtkinter as ctk
 import tkinter as tk
 from typing import Optional
-import ttkbootstrap as ttk
-from tkinter import filedialog
 import os
 import shutil
 from pathlib import Path
@@ -54,13 +53,15 @@ class SemanticSearchGUI:
             self.fresh_start()
         else:
             self.pdfs = self.get_stored_pdfs()
-        self.main_window=tk.Tk()
+
+        ctk.set_appearance_mode("System")
+        ctk.set_default_color_theme("blue")
+        self.main_window=ctk.CTk()
         self.main_window.protocol("WM_DELETE_WINDOW", self.save_state_and_close)
-        ttk.Style().theme_use('sandstone')
         self.import_thread:Thread=Thread(target = self.import_from_main)
         self.import_thread.start()
-        self.query_frame = ttk.Frame(self.main_window)
-        self.queries_results_frame=ttk.Frame(self.main_window)
+        self.query_frame = ctk.CTkFrame(self.main_window)
+        self.queries_results_frame=ctk.CTkFrame(self.main_window)
         
         self.populate_file_dialogue()
         
@@ -109,16 +110,16 @@ class SemanticSearchGUI:
                 #add new row to grid here
                 self.queries_results_frame.rowconfigure(i,weight=1)
                 #add query as Label here
-                query_label = ttk.Label(self.queries_results_frame, text=query)        
-                query_label.grid(column=0, row=i, sticky=tk.EW, padx=10, pady=10)
-                query_results=ttk.Frame(self.queries_results_frame)
-                query_results.grid(column=1, row=i, sticky=tk.EW, padx=10, pady=10)
+                query_label = ctk.CTkLabel(self.queries_results_frame, text=query)        
+                query_label.grid(column=0, row=i, sticky=ctk.EW, padx=10, pady=10)
+                query_results=ctk.CTkFrame(self.queries_results_frame)
+                query_results.grid(column=1, row=i, sticky=ctk.EW, padx=10, pady=10)
                 for result in self.state[pdf_path][query]:
                     #add result as button 
-                    query_result = ttk.Button(query_results,text=str(result), command = lambda pdf_path=pdf_path,result=result: self.open_pdf(pdf_path, result))
-                    query_result.pack(side=tk.LEFT)
-                delete_query_button=ttk.Button(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
-                delete_query_button.pack(side=tk.LEFT)
+                    query_result = ctk.CTkButton(query_results,text=str(result), command = lambda pdf_path=pdf_path,result=result: self.open_pdf(pdf_path, result))
+                    query_result.pack(side=ctk.LEFT)
+                delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
+                delete_query_button.pack(side=ctk.LEFT)
             self.queries_results_frame.pack()  
 
     def remove_query_result(self,query:str)->None:
@@ -130,7 +131,7 @@ class SemanticSearchGUI:
                 if query in self.state[self.current_pdf_path]:
                     del self.state[self.current_pdf_path][query]
         self.queries_results_frame.destroy()
-        self.queries_results_frame=ttk.Frame(self.main_window)
+        self.queries_results_frame=ctk.CTkFrame(self.main_window)
         self.query_frame.destroy()
         self.get_previous_queries(self.current_pdf_path)
         self.show_search_bar()
@@ -145,33 +146,33 @@ class SemanticSearchGUI:
         largely identical because the call to ``Searcher.forPDF()`` handles this case internally. 
         """
         self.queries_results_frame.destroy()
-        self.queries_results_frame=ttk.Frame(self.main_window)
+        self.queries_results_frame=ctk.CTkFrame(self.main_window)
         self.query_frame.destroy()
         
-        progress_bar= ttk.Progressbar(self.main_window,orient="horizontal",mode="determinate")
-        progress_bar.pack(side=tk.BOTTOM,padx=20,pady=20,fill='x',anchor='center')
-        progress_text= ttk.Label(self.main_window,text="Importing Libraries")
-        progress_text.pack(side=tk.BOTTOM)
-        progress_bar.step(5)
+        progress_bar= ctk.CTkProgressBar(self.main_window,mode="determinate")
+        progress_bar.pack(side=ctk.BOTTOM,padx=20,pady=20,fill='x',anchor='center')
+        progress_text= ctk.CTkLabel(self.main_window,text="Importing Libraries")
+        progress_text.pack(side=ctk.BOTTOM)
+        progress_bar.set(5)
         self.main_window.update()
         if self.import_thread.is_alive():
             self.import_thread.join()
 
         MODEL = SentenceEncoder.MODEL1
-        progress_bar.step(15)
+        progress_bar.set(20)
         self.main_window.update()
         self.current_pdf_path=pdf_path
         progress_text.configure(text="Loading Previous Queries")
-        progress_bar.step(5)
+        progress_bar.set(25)
         self.main_window.update()
         self.get_previous_queries(pdf_path)
-        progress_bar.step(10)
+        progress_bar.set(35)
         progress_text.configure(text="Loading Embeddings")
         self.main_window.update()
         self.search = Searcher.forPDF(
         SentenceEncoder(
             MODEL),pdf_path)
-        progress_bar.step(40)
+        progress_bar.set(75)
         progress_text.configure(text="Finalizing")
         
         self.main_window.update()
@@ -189,7 +190,7 @@ class SemanticSearchGUI:
         the `pdfs` directory and the embeddings will be created.
         """
         
-        filepath = filedialog.askopenfilename(title='Select a PDF', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
+        filepath = ctk.filedialog.askopenfilename(title='Select a PDF', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
         from semantic_pdf_search.main import Corpus,Constants
         MODEL = Constants.MODEL1
         EMBEDDINGS_DIR = Path(__file__).parent.parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
@@ -225,7 +226,7 @@ class SemanticSearchGUI:
         """
         User opens app, told to select Open ... -> Browse for PDF
         """
-        intro = ttk.Label(self.queries_results_frame, text="To start a search, first select a PDF. \n " \
+        intro = ctk.CTkLabel(self.queries_results_frame, text="To start a search, first select a PDF. \n " \
         "Click on Open ... -> Browse for PDF.")
         intro.grid(column=1,row=1)
         ...
@@ -236,11 +237,11 @@ class SemanticSearchGUI:
         A new frame is shown and the user is given a button which, 
         when pressed, presents an entry field for the user to enter a search query. 
         """
-        self.query_frame = ttk.Frame(self.main_window)
+        self.query_frame = ctk.CTkFrame(self.main_window)
         self.query_frame.pack(side=tk.BOTTOM,pady=50)
         entry_text=tk.StringVar()
-        query_entry_field = ttk.Entry(self.query_frame,textvariable=entry_text)
-        query_entry_instructions = ttk.Label(self.query_frame,text="Enter query:")
+        query_entry_field = ctk.CTkEntry(self.query_frame,textvariable=entry_text)
+        query_entry_instructions = ctk.CTkLabel(self.query_frame,text="Enter query:")
         query_entry_instructions.pack(side=tk.LEFT,padx=20)
         query_entry_field.bind("<Return>", lambda event: self.handle_enter_query(entry_text.get()))
         query_entry_field.pack(side=tk.BOTTOM)
@@ -270,16 +271,16 @@ class SemanticSearchGUI:
         self.queries_results_frame.columnconfigure(1, weight=3)
         #add query as Label here
         
-        query_label = ttk.Label(self.queries_results_frame, text=query)        
+        query_label = ctk.CTkLabel(self.queries_results_frame, text=query)        
         query_label.grid(column=0, row=0, sticky=tk.EW, padx=10, pady=10)
-        query_results=ttk.Frame(self.queries_results_frame)
+        query_results=ctk.CTkFrame(self.queries_results_frame)
         query_results.grid(column=1, row=0, sticky=tk.EW, padx=10, pady=10)
 
         for result in results:
             #add result as button 
-            query_result = ttk.Button(query_results,text=str(result), command = lambda result=result: self.open_pdf(self.current_pdf_path, result), style='Accent.TButton', padding=0)
+            query_result = ctk.CTkButton(query_results,text=str(result), command = lambda result=result: self.open_pdf(self.current_pdf_path, result), style='Accent.TCTkButton', padding=0)
             query_result.pack(side=tk.RIGHT)
-        delete_query_button=ttk.Button(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
+        delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
         delete_query_button.pack(side=tk.LEFT)
         self.queries_results_frame.pack()
 

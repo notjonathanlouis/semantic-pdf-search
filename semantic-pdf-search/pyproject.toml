@@ -9,7 +9,7 @@ description = "Search PDFs semantically"
 authors = [{name = "notjonathanlouis"}]
 requires-python = ">=3.6"
 dependencies = [
-    "ttkbootstrap",
+    "customtkinter",
     "pymupdf",
     "torch",
     "sentence-transformers"
