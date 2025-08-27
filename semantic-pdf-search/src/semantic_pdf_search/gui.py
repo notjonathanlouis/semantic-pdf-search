@@ -9,7 +9,7 @@ import pymupdf
 from threading import Thread
 import pickle
 
-PDFS_DIR = Path(__file__).parent.parent / Path("pdfs")
+PDFS_DIR = Path(__file__).parent / Path("pdfs")
 
 
 
@@ -48,11 +48,11 @@ class SemanticSearchGUI:
         Attempt to load the state file and otherwise give the instructional message. Load the filenames of previously
           embedded PDFs, present the main window to the user, start a thread to load the sentence-encoders module.
         """
+        self.menubar = None
+        self.factory_reset_confirmation = None
         self.state = self.load_state()
-        if self.state == None:
-            self.fresh_start()
-        else:
-            self.pdfs = self.get_stored_pdfs()
+
+        self.pdfs = self.get_recent_pdfs()
 
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
@@ -61,7 +61,16 @@ class SemanticSearchGUI:
         self.import_thread:Thread=Thread(target = self.import_from_main)
         self.import_thread.start()
         self.query_frame = ctk.CTkFrame(self.main_window)
-        self.queries_results_frame=ctk.CTkFrame(self.main_window)
+        self.queries_results_frame=ctk.CTkScrollableFrame(self.main_window)
+        #windows scrolling
+        self.queries_results_frame.bind_all("<MouseWheel>", self.scroll_results_frame)
+        #linux scrolling
+        self.queries_results_frame.bind_all("<Button-4>", self.scroll_results_frame)  
+        self.queries_results_frame.bind_all("<Button-5>", self.scroll_results_frame)  
+        
+        if self.is_first_run == True:   
+            self.fresh_start()
+            self.queries_results_frame.pack(fill='both',expand=True)
         
         self.populate_file_dialogue()
         
@@ -81,22 +90,59 @@ class SemanticSearchGUI:
             os.mkdir(PDFS_DIR)
         return [str(child) for child in PDFS_DIR.iterdir()]
         
+    def get_recent_pdfs(self) -> list[str]:
+        """
+        Return a list of recently opened PDFs by filename.
+        """
+        files_times = []
+        if not os.path.isdir(PDFS_DIR):
+            os.mkdir(PDFS_DIR)
+        for child in PDFS_DIR.iterdir():
+            if child.is_file():
+                try:
+                    files_times.append((str(child),os.path.getmtime(child)))
+                except Exception as e:
+                    continue
+        files_times.sort(key=lambda x: x[1], reverse=True)
+        return [file for file, _ in files_times[:10]]
 
         
     def populate_file_dialogue(self) -> None:
         """
         Populates the file dialogue. This includes buttons to load previously embedded PDFs and one to embed a new PDF from a file dialogue.
         """
-        self.menubar=tk.Menu(self.main_window)
-        submenu=tk.Menu(self.menubar,tearoff=0)
-        self.main_window.config(menu=self.menubar)
-        self.menubar.add_cascade(label="Open ...",menu=submenu)
-        self.menubar.add_command(label="")
-        for path in self.pdfs:
-            name = Path(path).name
-            submenu.add_command(label=name, command=lambda path=path: self.load_known_pdf(path))
-        submenu.add_separator()
-        submenu.add_command(label="Open PDF", command=self.browse_for_pdf)
+        if self.menubar is not None: 
+            temp_pdfs = self.get_recent_pdfs()
+            for path in [path for path in temp_pdfs if path not in self.pdfs]:
+                name = Path(path).name
+                self.pdf_menu.insert_command(0,label=name, command=lambda path=path: self.load_known_pdf(path))
+            
+        else:
+            self.menubar=tk.Menu(self.main_window)
+            submenu=tk.Menu(self.menubar,tearoff=0)
+            self.main_window.config(menu=self.menubar)
+            self.menubar.add_cascade(label="File ...",menu=submenu)
+            self.pdf_menu = tk.Menu(self.menubar, tearoff=0)
+            settings_menu = tk.Menu(self.menubar, tearoff=0)
+
+            submenu.add_cascade(label="Open ...", menu=self.pdf_menu)
+            for path in self.pdfs:
+                    name = Path(path).name
+                    self.pdf_menu.add_command(label=name, command=lambda path=path: self.load_known_pdf(path))
+            self.pdf_menu.add_command(label="Browse for PDF", command=self.browse_for_pdf)        
+
+            submenu.add_cascade(label="Settings", menu=settings_menu)
+            
+            settings_menu.add_command(label="Factory Reset", command=self.spawn_reset_window)
+            
+            submenu.add_command(label="Quit", command=self.save_state_and_close)
+            
+            self.menubar.add_command(label="")
+            
+           
+            submenu.add_separator()
+            
+        
     
     def get_previous_queries(self, pdf_path: str) -> None:
         """
@@ -120,7 +166,17 @@ class SemanticSearchGUI:
                     query_result.pack(side=ctk.LEFT)
                 delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
                 delete_query_button.pack(side=ctk.LEFT)
-            self.queries_results_frame.pack()  
+            self.queries_results_frame.pack(fill='both',expand=True)  
+
+    def scroll_results_frame(self, event):
+        """Scroll the frame when the mouse wheel is used."""
+        if event.num == 4:
+            self.queries_results_frame._parent_canvas.yview_scroll(-1, "units")
+        elif event.num == 5:
+            self.queries_results_frame._parent_canvas.yview_scroll(1, "units")
+        else:
+            self.queries_results_frame._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
 
     def remove_query_result(self,query:str)->None:
         """
@@ -130,8 +186,9 @@ class SemanticSearchGUI:
             if self.current_pdf_path in self.state:
                 if query in self.state[self.current_pdf_path]:
                     del self.state[self.current_pdf_path][query]
-        self.queries_results_frame.destroy()
-        self.queries_results_frame=ctk.CTkFrame(self.main_window)
+        for widget in self.queries_results_frame.winfo_children():
+            widget.destroy()
+
         self.query_frame.destroy()
         self.get_previous_queries(self.current_pdf_path)
         self.show_search_bar()
@@ -145,8 +202,9 @@ class SemanticSearchGUI:
         Originally there were supposed to be two functions depending on if the embedding file existed for that PDF but they would be 
         largely identical because the call to ``Searcher.forPDF()`` handles this case internally. 
         """
-        self.queries_results_frame.destroy()
-        self.queries_results_frame=ctk.CTkFrame(self.main_window)
+        for widget in self.queries_results_frame.winfo_children():
+            widget.destroy()
+
         self.query_frame.destroy()
         
         progress_bar= ctk.CTkProgressBar(self.main_window,mode="determinate")
@@ -178,7 +236,7 @@ class SemanticSearchGUI:
         self.main_window.update()
         self.main_window.title(f"Semantic search: {Path(pdf_path).name}")
         self.menubar.delete(2)
-        self.menubar.add_command(label=f"Current PDF: {Path(pdf_path).name}")
+        self.menubar.insert_command(2,label=f"Current PDF: {Path(pdf_path).name}")
         progress_bar.destroy()
         self.show_search_bar()
         progress_text.destroy()
@@ -190,10 +248,10 @@ class SemanticSearchGUI:
         the `pdfs` directory and the embeddings will be created.
         """
         
-        filepath = ctk.filedialog.askopenfilename(title='Select a PDF', initialdir=os.getcwd(), filetypes=(('PDF', '*.pdf'), ))
+        filepath = ctk.filedialog.askopenfilename(title='Select a PDF', initialdir=PDFS_DIR, filetypes=(('PDF', '*.pdf'), ))
         from semantic_pdf_search.main import Corpus,Constants
         MODEL = Constants.MODEL1
-        EMBEDDINGS_DIR = Path(__file__).parent.parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
+        EMBEDDINGS_DIR = Path(__file__).parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
         if not os.path.isdir(EMBEDDINGS_DIR.parent):
             os.mkdir(EMBEDDINGS_DIR.parent)
         if not os.path.isdir(EMBEDDINGS_DIR):
@@ -213,6 +271,8 @@ class SemanticSearchGUI:
                     new_path = PDFS_DIR / Path(f"{Path(filepath).name}_")
                     shutil.copy(filepath,new_path)
                     self.load_known_pdf(str(new_path))
+                
+                self.populate_file_dialogue()
             reader.close()
 
 
@@ -224,11 +284,13 @@ class SemanticSearchGUI:
 
     def fresh_start(self)-> None:
         """
-        User opens app, told to select Open ... -> Browse for PDF
+        User opens app, told to select File ... -> Browse for PDF
         """
         intro = ctk.CTkLabel(self.queries_results_frame, text="To start a search, first select a PDF. \n " \
-        "Click on Open ... -> Browse for PDF.")
+        "Click on File ... -> Browse for PDF.", font=ctk.CTkFont(size=20, weight="bold"))
+        
         intro.grid(column=1,row=1)
+        
         ...
 
     
@@ -282,16 +344,17 @@ class SemanticSearchGUI:
             query_result.pack(side=tk.RIGHT)
         delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
         delete_query_button.pack(side=tk.LEFT)
-        self.queries_results_frame.pack()
+        self.queries_results_frame.pack(fill='both',expand=True)
 
     def save_state_and_close(self)-> None:
         """
         The query, the PDF hash, and all the results are stored to a 
         pickle dictionary file. 
         """
-        directory=Path(__file__).parent.parent
+        directory=Path(__file__).parent
         file=Path("state.pck")
         with open(directory / file, "wb") as f:
+            print(directory / file)
             pickle.dump(file=f,obj=self.state)
         self.main_window.destroy()
     def load_state(self) -> Optional[dict[str, dict[str, list[int]]]]:
@@ -301,16 +364,63 @@ class SemanticSearchGUI:
         """
         state:dict[str,dict[str,list[int]]];
 
-        directory=Path(__file__).parent.parent
+        directory=Path(__file__).parent
+        print(directory)
         file=Path("state.pck")
+        
         if f"{file}" in os.listdir(directory):
             with open(directory / file, "rb") as f:
                 state=pickle.load(file=f)
+            self.is_first_run = False
         else:
             state=dict[str,dict[str,list[int]]]()
+            self.is_first_run = True
 
         return state
-
+    def spawn_reset_window(self)-> None:
+        """
+        Deletes all stored PDFs and embeddings. Also deletes the state file if it exists.
+        """
+        if self.factory_reset_confirmation is not None:
+            return
+        self.factory_reset_confirmation = ctk.CTkToplevel(self.main_window)
+        self.factory_reset_confirmation.title("Confirm Factory Reset")
+        
+        label = ctk.CTkLabel(self.factory_reset_confirmation, text="Are you sure you want to factory reset? This will delete all stored PDFs and embeddings.", wraplength=300)
+        label.pack(pady=20)
+        button_frame = ctk.CTkFrame(self.factory_reset_confirmation)
+        button_frame.pack(pady=10)
+        yes_button = ctk.CTkButton(button_frame, text="Yes", command= self.perform_factory_reset)
+        yes_button.pack(side=ctk.LEFT, padx=10)
+        no_button = ctk.CTkButton(button_frame, text="No", command=self.cancel_factory_reset)
+        no_button.pack(side=ctk.LEFT, padx=10)
+        self.factory_reset_confirmation.protocol("WM_DELETE_WINDOW", self.cancel_factory_reset) 
+    def cancel_factory_reset(self)-> None:
+        """ 
+        Cancels the factory reset operation and closes the confirmation dialog.
+        """
+        if self.factory_reset_confirmation is not None:
+            self.factory_reset_confirmation.destroy()
+            self.factory_reset_confirmation = None
+    def perform_factory_reset(self)-> None:
+        """
+        Performs the factory reset by deleting all stored PDFs, embeddings, and the state file.
+        Then, it reinitializes the GUI.
+        """
+        root_dir=Path(__file__).parent  
+        pdf_dir = root_dir / Path("pdfs")
+        if os.path.isdir(pdf_dir):
+            shutil.rmtree(pdf_dir)
+        embeddings_dir = root_dir / Path("embeddings")
+        if os.path.isdir(embeddings_dir):
+            shutil.rmtree(embeddings_dir)
+        
+        file=Path("state.pck")
+        if f"{file}" in os.listdir(root_dir):
+            os.remove(root_dir / file)
+        self.main_window.destroy()
+        self.__init__()
+        self.main_window.mainloop()
 def main():
     if not is_connected():
         os.environ["HF_HUB_OFFLINE"] = "1"
