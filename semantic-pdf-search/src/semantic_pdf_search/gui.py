@@ -131,6 +131,8 @@ class SemanticSearchGUI:
                     self.pdf_menu.add_command(label=name, command=lambda path=path: self.load_known_pdf(path))
             self.pdf_menu.add_command(label="Browse for PDF", command=self.browse_for_pdf)        
 
+            submenu.add_separator()    
+            
             submenu.add_cascade(label="Settings", menu=settings_menu)
             
             settings_menu.add_command(label="Factory Reset", command=self.spawn_reset_window)
@@ -140,7 +142,7 @@ class SemanticSearchGUI:
             self.menubar.add_command(label="")
             
            
-            submenu.add_separator()
+           
             
         
     
@@ -354,7 +356,6 @@ class SemanticSearchGUI:
         directory=Path(__file__).parent
         file=Path("state.pck")
         with open(directory / file, "wb") as f:
-            print(directory / file)
             pickle.dump(file=f,obj=self.state)
         self.main_window.destroy()
     def load_state(self) -> Optional[dict[str, dict[str, list[int]]]]:
@@ -365,7 +366,6 @@ class SemanticSearchGUI:
         state:dict[str,dict[str,list[int]]];
 
         directory=Path(__file__).parent
-        print(directory)
         file=Path("state.pck")
         
         if f"{file}" in os.listdir(directory):
