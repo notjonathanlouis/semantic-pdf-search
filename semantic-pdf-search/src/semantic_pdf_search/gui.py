@@ -289,7 +289,7 @@ class SemanticSearchGUI:
         User opens app, told to select File ... -> Browse for PDF
         """
         intro = ctk.CTkLabel(self.queries_results_frame, text="To start a search, first select a PDF. \n " \
-        "Click on File ... -> Browse for PDF.", font=ctk.CTkFont(size=20, weight="bold"))
+        "Click on File ... -> Open ... -> Browse for PDF.", font=ctk.CTkFont(size=20, weight="bold"))
         
         intro.grid(column=1,row=1)
         

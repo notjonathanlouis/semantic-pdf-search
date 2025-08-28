@@ -4,21 +4,43 @@ By Jordan Zedeck and Jonathan Louis
 A semantic PDF searching application, written in python. This application uses ML an embedding model to encode the document and the user's query, allowing for near-matches of the query to be presented to the user. The page numbers with near-matches are shown to the user as buttons which, when clicked, will open the PDF at that page in the default browser.
 
 
+
 ### Example:
 
 ![alt text](assets/great-gatsby-search.png)
 
 ![alt text](assets/great-gatsby-result.png)
+## This package requires tkinter!!!!
+## See the section below for instructions on installing tkinter on macOS and Windows
+### Installing tkinter on macOS and Windows:
+If the following command does not open a new tk window, 
+`python -m tkinter`
+Then you must install tkinter manually:
+
+#### Windows
+Run the [python installer](https://www.python.org/downloads/windows/)
+Ensure the tcl/tk checkbox is ticked
+
+#### macOS
+With brew:
+`brew install python-tk`
 
 ### Installation:
-
-(tbd)
+From pip:
+`pip install semantic-pdf-search`
+Install from source:
+(in the root directory of the github project)
+```
+cd semantic-pdf-search
+python -m build
+pip install dist/semantic_pdf_search-0.8.0-py3-none-any.whl
+```
 
 ### Usage tutorial:
 
 From the command line:
 
-`semantic-search-gui`
+`semantic-pdf-search`
 
 Browse for a new PDF:
 
