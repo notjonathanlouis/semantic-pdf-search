@@ -132,7 +132,7 @@ class SemanticSearchGUI:
             self.pdf_menu.add_command(label="Browse for PDF", command=self.browse_for_pdf)        
 
             submenu.add_separator()    
-            
+
             submenu.add_cascade(label="Settings", menu=settings_menu)
             
             settings_menu.add_command(label="Factory Reset", command=self.spawn_reset_window)
@@ -213,26 +213,26 @@ class SemanticSearchGUI:
         progress_bar.pack(side=ctk.BOTTOM,padx=20,pady=20,fill='x',anchor='center')
         progress_text= ctk.CTkLabel(self.main_window,text="Importing Libraries")
         progress_text.pack(side=ctk.BOTTOM)
-        progress_bar.set(5)
+        progress_bar.set(.05)
         self.main_window.update()
         if self.import_thread.is_alive():
             self.import_thread.join()
 
         MODEL = SentenceEncoder.MODEL1
-        progress_bar.set(20)
+        progress_bar.set(.20)
         self.main_window.update()
         self.current_pdf_path=pdf_path
         progress_text.configure(text="Loading Previous Queries")
-        progress_bar.set(25)
+        progress_bar.set(.25)
         self.main_window.update()
         self.get_previous_queries(pdf_path)
-        progress_bar.set(35)
+        progress_bar.set(.35)
         progress_text.configure(text="Loading Embeddings")
         self.main_window.update()
         self.search = Searcher.forPDF(
         SentenceEncoder(
             MODEL),pdf_path)
-        progress_bar.set(75)
+        progress_bar.set(.75)
         progress_text.configure(text="Finalizing")
         
         self.main_window.update()
