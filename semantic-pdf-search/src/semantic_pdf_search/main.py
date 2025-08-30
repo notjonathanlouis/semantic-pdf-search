@@ -133,10 +133,10 @@ class Searcher:
     def __init__(self, 
                  model : AbstractModel,
                  corpus : Corpus,
-                 path : str = "embeddings"):        
+                 embeddings_dir : str = "embeddings"):        
         self.model = model
         self.corpus = corpus
-        self.encodings = self.__load_embeddings(path)
+        self.encodings = self.__load_embeddings(embeddings_dir)
 
     def __encode_corpus(self):
         """
@@ -144,18 +144,18 @@ class Searcher:
         """
         return torch.stack([self.model(text) for text in self.corpus.texts], dim = 1)
 
-    def __load_embeddings(self, path : str) -> Tensor:
+    def __load_embeddings(self, embeddings_dir : str) -> Tensor:
         """
         Check if PDF has already been embedded. If so, load the embedding from the file and return it, otherwise create an embedding file for this PDF
         and then encodes all text in the corpus and saves the result to the embedding file, finally returning the embedding.
         """
-        if path not in os.listdir("."):
-            os.mkdir(f"./{path}")
-        dir = f"./{path}/{self.model.encoder_name()}"
-        if self.model.encoder_name() not in os.listdir(f"./{path}"):
+        if not os.path.exists(embeddings_dir):
+            os.mkdir(embeddings_dir)
+        dir = f"{embeddings_dir}/{self.model.encoder_name()}"
+        if self.model.encoder_name() not in os.listdir(embeddings_dir):
             os.mkdir(dir)
         corpus_hash = hash(self.corpus)
-        file_path = f"./{dir}/{corpus_hash}"
+        file_path = f"{dir}/{corpus_hash}"
         if f"{corpus_hash}" in os.listdir(dir):
             with open(file_path, "rb") as f:
                 return torch.load(f)
@@ -174,31 +174,39 @@ class Searcher:
             out_list.append(page.get_text())
 
     @staticmethod
-    def forPDF(model : AbstractModel, path : str) -> "Searcher":
+    def forPDF(model : AbstractModel, pdf_path : str, embeddings_dir : str) -> "Searcher":
         """
         Open the PDF and encode the text using the specified model. Threaded.
         """
-        reader = pymupdf.open(path)
-        pages = [reader.load_page(i) for i in range(len(reader))]
-        page_lists = []
-        batch_size = len(pages) // THREADS
-        i = 0
-        for i in range(0,len(pages)-batch_size, batch_size):
-            page_lists.append(pages[i:(i+batch_size)])
-        page_lists.append(pages[i:])
-        threads : list[Thread] = []
-        out_str_lists = [[] for _ in range(THREADS)]
-        for i in range(0,THREADS):
-            threads.append(Thread(target = Searcher.__read_pages, args = (page_lists[i], out_str_lists[i])))
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-        texts : list[str] = []
-        for out_strs in out_str_lists:
-            texts.extend(out_strs)
-        reader.close()
-        return Searcher(model, Corpus(texts))
+        if THREADS:
+            reader = pymupdf.open(pdf_path)
+            pages = [reader.load_page(i) for i in range(len(reader))]
+            page_lists = []
+            num_pages = len(pages)
+
+
+            if num_pages>THREADS:
+                batch_size = num_pages // THREADS 
+            else:
+                batch_size = num_pages
+
+            i = 0
+            for i in range(0,len(pages)-batch_size, batch_size):
+                page_lists.append(pages[i:(i+batch_size)])
+            page_lists.append(pages[i:])
+            threads : list[Thread] = []
+            out_str_lists = [[] for _ in range(len(page_lists))]
+            for i in range(len(page_lists)):
+                threads.append(Thread(target = Searcher.__read_pages, args = (page_lists[i], out_str_lists[i])))
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            texts : list[str] = []
+            for out_strs in out_str_lists:
+                texts.extend(out_strs)
+            reader.close()
+            return Searcher(model, Corpus(texts), embeddings_dir)
     
 
     

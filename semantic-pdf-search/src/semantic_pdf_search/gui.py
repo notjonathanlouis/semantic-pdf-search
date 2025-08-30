@@ -219,6 +219,7 @@ class SemanticSearchGUI:
             self.import_thread.join()
 
         MODEL = SentenceEncoder.MODEL1
+        EMBEDDINGS_DIR = Path(__file__).parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
         progress_bar.set(.20)
         self.main_window.update()
         self.current_pdf_path=pdf_path
@@ -229,9 +230,9 @@ class SemanticSearchGUI:
         progress_bar.set(.35)
         progress_text.configure(text="Loading Embeddings")
         self.main_window.update()
-        self.search = Searcher.forPDF(
+        self.searcher = Searcher.forPDF(
         SentenceEncoder(
-            MODEL),pdf_path)
+            MODEL),pdf_path, str(EMBEDDINGS_DIR))
         progress_bar.set(.75)
         progress_text.configure(text="Finalizing")
         
@@ -262,18 +263,12 @@ class SemanticSearchGUI:
             reader = pymupdf.open(filepath)
             pages = [reader.load_page(i) for i in range(len(reader))]
             corpus = Corpus([page.get_text() for page in pages])
-            corpus_hash=corpus.__hash__
-            embedding = (EMBEDDINGS_DIR / Path(str(corpus_hash)))
+            embedding = (EMBEDDINGS_DIR / Path(str(corpus.__hash__())))
             if embedding not in  EMBEDDINGS_DIR.iterdir():
                 if(Path(filepath) not in PDFS_DIR.iterdir()):
                     new_path = PDFS_DIR / Path(filepath).name
                     shutil.copy(filepath,PDFS_DIR)
-                    self.load_known_pdf(str(new_path))
-                else:
-                    new_path = PDFS_DIR / Path(f"{Path(filepath).name}_")
-                    shutil.copy(filepath,new_path)
-                    self.load_known_pdf(str(new_path))
-                
+                self.load_known_pdf(str(PDFS_DIR / Path(filepath).name))
                 self.populate_file_dialogue()
             reader.close()
 
@@ -316,9 +311,9 @@ class SemanticSearchGUI:
         """
         if self.state != None:
             if self.current_pdf_path not in self.state:
-                self.state[self.current_pdf_path]={entry:self.search(entry,top_k=5)}
+                self.state[self.current_pdf_path]={entry:self.searcher(entry,top_k=5)}
             else:
-                self.state[self.current_pdf_path][entry]=self.search(entry,top_k=5)
+                self.state[self.current_pdf_path][entry]=self.searcher(entry,top_k=5)
         self.get_previous_queries(self.current_pdf_path)
         ...
     
