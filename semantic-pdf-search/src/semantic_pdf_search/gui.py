@@ -63,10 +63,10 @@ class SemanticSearchGUI:
         self.query_frame = ctk.CTkFrame(self.main_window)
         self.queries_results_frame=ctk.CTkScrollableFrame(self.main_window)
         #windows scrolling
-        self.queries_results_frame.bind_all("<MouseWheel>", self.scroll_results_frame)
+        #self.queries_results_frame.bind_all("<MouseWheel>", self.scroll_results_frame)
         #linux scrolling
-        self.queries_results_frame.bind_all("<Button-4>", self.scroll_results_frame)  
-        self.queries_results_frame.bind_all("<Button-5>", self.scroll_results_frame)  
+        #self.queries_results_frame.bind_all("<Button-4>", self.scroll_results_frame)  
+        #self.queries_results_frame.bind_all("<Button-5>", self.scroll_results_frame)  
         
         if self.is_first_run == True:   
             self.fresh_start()
@@ -112,8 +112,15 @@ class SemanticSearchGUI:
         Populates the file dialogue. This includes buttons to load previously embedded PDFs and one to embed a new PDF from a file dialogue.
         """
         if self.menubar is not None: 
-            temp_pdfs = self.get_recent_pdfs()
-            for path in [path for path in temp_pdfs if path not in self.pdfs]:
+            self.pdfs = self.get_recent_pdfs()
+            browse_button_index=self.pdf_menu.index('end')
+            if not browse_button_index:
+                browse_button_index = 0
+
+            for i in range(browse_button_index):
+                self.pdf_menu.delete(0)
+
+            for path in reversed(self.pdfs):
                 name = Path(path).name
                 self.pdf_menu.insert_command(0,label=name, command=lambda path=path: self.load_known_pdf(path))
             
@@ -188,12 +195,20 @@ class SemanticSearchGUI:
             if self.current_pdf_path in self.state:
                 if query in self.state[self.current_pdf_path]:
                     del self.state[self.current_pdf_path][query]
+        target_row = None
         for widget in self.queries_results_frame.winfo_children():
+            if isinstance(widget, ctk.CTkLabel):
+                if widget.cget('text') == query:
+                    target_row = widget.grid_info()['row']
+        should_stick_to_bottom = False
+        print(self.queries_results_frame._parent_canvas.yview()[1])
+        if self.queries_results_frame._parent_canvas.yview()[1] == 1.0:
+            should_stick_to_bottom = True        
+        for widget in self.queries_results_frame.grid_slaves(row=target_row):
             widget.destroy()
-
-        self.query_frame.destroy()
-        self.get_previous_queries(self.current_pdf_path)
-        self.show_search_bar()
+        if should_stick_to_bottom:
+            self.queries_results_frame._parent_canvas.yview_moveto(1.0)
+        self.main_window.update()
 
     def load_known_pdf(self,pdf_path:str)-> None:
         """
@@ -219,7 +234,6 @@ class SemanticSearchGUI:
             self.import_thread.join()
 
         MODEL = SentenceEncoder.MODEL1
-        EMBEDDINGS_DIR = Path(__file__).parent / Path("embeddings") / Path(f"Encoder: {MODEL}")
         progress_bar.set(.20)
         self.main_window.update()
         self.current_pdf_path=pdf_path
@@ -232,7 +246,7 @@ class SemanticSearchGUI:
         self.main_window.update()
         self.searcher = Searcher.forPDF(
         SentenceEncoder(
-            MODEL),pdf_path, str(EMBEDDINGS_DIR))
+            MODEL),pdf_path, str(Path(__file__).parent / Path("embeddings")))
         progress_bar.set(.75)
         progress_text.configure(text="Finalizing")
         
@@ -313,12 +327,31 @@ class SemanticSearchGUI:
             if self.current_pdf_path not in self.state:
                 self.state[self.current_pdf_path]={entry:self.searcher(entry,top_k=5)}
             else:
-                self.state[self.current_pdf_path][entry]=self.searcher(entry,top_k=5)
-        self.get_previous_queries(self.current_pdf_path)
-        ...
-    
-
-
+                if entry not in self.state[self.current_pdf_path]:
+                    self.state[self.current_pdf_path][entry]=self.searcher(entry,top_k=5)
+                    [ _ , num_rows ] = self.queries_results_frame.grid_size()
+                    should_stick_to_bottom = False
+                    print(self.queries_results_frame._parent_canvas.yview()[1])
+                    if self.queries_results_frame._parent_canvas.yview()[1] == 1.0:
+                        should_stick_to_bottom = True
+                    self.queries_results_frame.rowconfigure(num_rows,weight=1)
+                    #add query as Label here
+                    query_label = ctk.CTkLabel(self.queries_results_frame, text=entry)        
+                    query_label.grid(column=0, row=num_rows, sticky=ctk.EW, padx=10, pady=10)
+                    query_results=ctk.CTkFrame(self.queries_results_frame)
+                    query_results.grid(column=1, row=num_rows, sticky=ctk.EW, padx=10, pady=10)
+                    for result in self.state[self.current_pdf_path][entry]:
+                        #add result as button 
+                        query_result = ctk.CTkButton(query_results,text=str(result), command = lambda pdf_path=self.current_pdf_path,result=result: self.open_pdf(pdf_path, result))
+                        query_result.pack(side=ctk.LEFT)
+                    delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=entry: self.remove_query_result(query=query))
+                    delete_query_button.pack(side=ctk.LEFT)
+                    if should_stick_to_bottom:
+                        self.queries_results_frame._parent_canvas.yview_moveto(1.0)
+                    self.main_window.update()
+                        
+                    
+                    
     def display_results(self,query:str, results: list[int])->None:
         """
         Once all pages have been searched and the top 5 results have been found, 

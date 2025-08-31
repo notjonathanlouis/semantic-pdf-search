@@ -5,7 +5,9 @@
 (done) add settings? themes? maybe don't need to go that  far....
 (done) add a quit button to the menubar
 (done) repopulate file dialog when new pdf is added
-add a remove all queries button?
+
+(done) make it so that the frame sticks to the bottom when new entries are added AND the view is already at the bottom (by modifying handle_enter_query(...))
+(done?) go through the GUI code and make it so that any code that deletes and regenerates a frame instead modifies the frame's contents using insert / remove (at) commands when applicable. 
 
 
 need to rewrite the readme
