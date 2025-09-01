@@ -2,18 +2,18 @@
 
 **A semantic PDF searching application, written in Python.** 🔎
 
-### By Jordan Zedeck and Jonathan Louis
+By Jordan Zedeck and Jonathan Louis
 
 
 
 ## 📖 Overview
 
-The **semantic-pdf-search** GUI app utilizes a machine learning embedding model to encode both a PDF document and a user's queries. This process enables the application to find **near-matches** to the query within the document, much like an internet search engine would for web-pages. The page number results are displayed as buttons which can be clicked to open the PDF directly to the page in your default web browser.
+This application utilizes a machine learning embedding model to encode both a PDF document and a user's queries. This process enables the application to find near-matches to the query within the document, much like an internet search engine would for web-pages. The page number results are displayed as buttons which can be clicked to open the PDF directly to the page in your default web browser.
 
 ## ✨ Features
 
   * **Semantic Search:** Finds near-matches and related concepts, not just exact keywords.
-  * **Offline Operability:** Once semantic-pdf-search is installed, it can be used completely offline.
+  * **Offline Operability:** Once semantic-pdf-search is installed and used once, it can be used completely offline.
   * **Cross-Platform:** Supports Linux, Windows and macOS.
 
 ## 🖼️ Example
@@ -79,7 +79,7 @@ semantic-pdf-search
 
 ### Basic Usage Guide
 
-1.  **Browse for a PDF:** The application window will open. Click on "File" -> "Open ..." -> "Browse for PDF" to select a PDF file.
+1.  **Browse for a PDF:** Click on "File ..." -> "Open ..." -> "Browse for PDF" to browse for a PDF file.
 2.  **Select and Open:** Navigate to your PDF, select it, and click "Open".
 3.  **Wait for Embeddings:** The application will process the document and create embeddings. This may take a moment, especially for large files.
 4.  **Enter a Query:** Once the document is loaded, type your query into the search bar and press **Enter**.
