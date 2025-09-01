@@ -191,9 +191,10 @@ class Searcher:
                 batch_size = num_pages
 
             i = 0
-            for i in range(0,len(pages)-batch_size, batch_size):
+            end_page = num_pages #batch_size*(num_pages // batch_size)
+            for i in range(0,end_page, batch_size):
                 page_lists.append(pages[i:(i+batch_size)])
-            page_lists.append(pages[i:])
+            #page_lists.append(pages[i:])
             threads : list[Thread] = []
             out_str_lists = [[] for _ in range(len(page_lists))]
             for i in range(len(page_lists)):

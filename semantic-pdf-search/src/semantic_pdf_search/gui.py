@@ -121,7 +121,7 @@ class SemanticSearchGUI:
 
             for path in reversed(self.pdfs):
                 name = Path(path).name
-                self.pdf_menu.insert_command(0,label=name, command=lambda path=path: self.load_known_pdf(path))
+                self.pdf_menu.insert_command(0,label=name, command=lambda path=path: self.load_pdf(path))
             
         else:
             self.menubar=tk.Menu(self.main_window)
@@ -134,7 +134,7 @@ class SemanticSearchGUI:
             submenu.add_cascade(label="Open ...", menu=self.pdf_menu)
             for path in self.pdfs:
                     name = Path(path).name
-                    self.pdf_menu.add_command(label=name, command=lambda path=path: self.load_known_pdf(path))
+                    self.pdf_menu.add_command(label=name, command=lambda path=path: self.load_pdf(path))
             self.pdf_menu.add_command(label="Browse for PDF", command=self.browse_for_pdf)        
 
             submenu.add_separator()    
@@ -209,7 +209,7 @@ class SemanticSearchGUI:
         self.main_window.update()
         self.update_should_scroll()
 
-    def load_known_pdf(self,pdf_path:str)-> None:
+    def load_pdf(self,pdf_path:str)-> None:
         """
         Load a known PDF and display previous queries. Also sets the window title. 
         Loading a PDF can take a while even if the embedding file exists because of the import time for the sentence-transformers package
@@ -276,13 +276,20 @@ class SemanticSearchGUI:
             reader = pymupdf.open(filepath)
             pages = [reader.load_page(i) for i in range(len(reader))]
             corpus = Corpus([page.get_text() for page in pages])
-            embedding = (EMBEDDINGS_DIR / Path(str(corpus.__hash__())))
-            if embedding not in  EMBEDDINGS_DIR.iterdir():
-                if(Path(filepath) not in PDFS_DIR.iterdir()):
-                    new_path = PDFS_DIR / Path(filepath).name
+            embedding = EMBEDDINGS_DIR / Path(str(hash(corpus)))
+            embedding_names = [path.name for path in EMBEDDINGS_DIR.iterdir()]
+            if embedding.name not in embedding_names:
+                pdf_names = [pdf.name for pdf in PDFS_DIR.iterdir()]
+                if(Path(filepath).name not in pdf_names):
                     shutil.copy(filepath,PDFS_DIR)
-                self.load_known_pdf(str(PDFS_DIR / Path(filepath).name))
+                    self.load_pdf(str(PDFS_DIR / Path(filepath).name))
+                else:
+                    new_path = PDFS_DIR / f"_{Path(filepath).name}"
+                    shutil.copy(filepath,new_path)
+                    self.load_pdf(str(new_path))
                 self.populate_file_dialogue()
+            else:
+                self.load_pdf(filepath)
             reader.close()
 
 
@@ -325,30 +332,31 @@ class SemanticSearchGUI:
         if self.state != None:
             if self.current_pdf_path not in self.state:
                 self.state[self.current_pdf_path]={entry:self.searcher(entry,top_k=5)}
+            elif entry not in self.state[self.current_pdf_path]:
+                self.state[self.current_pdf_path][entry]=self.searcher(entry,top_k=5)
             else:
-                if entry not in self.state[self.current_pdf_path]:
-                    self.state[self.current_pdf_path][entry]=self.searcher(entry,top_k=5)
-                    [ _ , num_rows ] = self.queries_results_frame.grid_size()
-                    should_stick_to_bottom = False
-                    if self.queries_results_frame._parent_canvas.yview()[1] == 1.0:
-                        should_stick_to_bottom = True
-                    self.queries_results_frame.rowconfigure(num_rows,weight=1)
-                    #add query as Label here
-                    query_label = ctk.CTkLabel(self.queries_results_frame, text=entry)        
-                    query_label.grid(column=0, row=num_rows, sticky=ctk.EW, padx=10, pady=10)
-                    query_results=ctk.CTkFrame(self.queries_results_frame)
-                    query_results.grid(column=1, row=num_rows, sticky=ctk.EW, padx=10, pady=10)
-                    for result in self.state[self.current_pdf_path][entry]:
-                        #add result as button 
-                        query_result = ctk.CTkButton(query_results,text=str(result), command = lambda pdf_path=self.current_pdf_path,result=result: self.open_pdf(pdf_path, result))
-                        query_result.pack(side=ctk.LEFT)
-                    delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=entry: self.remove_query_result(query=query))
-                    delete_query_button.pack(side=ctk.LEFT)
-                    if should_stick_to_bottom:
-                        self.queries_results_frame._parent_canvas.yview_moveto(1.0)
-                    self.main_window.update()
-                    self.update_should_scroll()
-                        
+                return
+            [ _ , num_rows ] = self.queries_results_frame.grid_size()
+            should_stick_to_bottom = False
+            if self.queries_results_frame._parent_canvas.yview()[1] == 1.0:
+                should_stick_to_bottom = True
+            self.queries_results_frame.rowconfigure(num_rows,weight=1)
+            #add query as Label here
+            query_label = ctk.CTkLabel(self.queries_results_frame, text=entry)        
+            query_label.grid(column=0, row=num_rows, sticky=ctk.EW, padx=10, pady=10)
+            query_results=ctk.CTkFrame(self.queries_results_frame)
+            query_results.grid(column=1, row=num_rows, sticky=ctk.EW, padx=10, pady=10)
+            for result in self.state[self.current_pdf_path][entry]:
+                #add result as button 
+                query_result = ctk.CTkButton(query_results,text=str(result), command = lambda pdf_path=self.current_pdf_path,result=result: self.open_pdf(pdf_path, result))
+                query_result.pack(side=ctk.LEFT)
+            delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=entry: self.remove_query_result(query=query))
+            delete_query_button.pack(side=ctk.LEFT)
+            if should_stick_to_bottom:
+                self.queries_results_frame._parent_canvas.yview_moveto(1.0)
+            self.main_window.update()
+            self.update_should_scroll()
+                    
                     
     def update_should_scroll(self, event = None)->None:
         if self.queries_results_frame != None and self.current_pdf_path != None:
