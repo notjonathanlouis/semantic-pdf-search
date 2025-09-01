@@ -49,6 +49,7 @@ class SemanticSearchGUI:
           embedded PDFs, present the main window to the user, start a thread to load the sentence-encoders module.
         """
         self.menubar = None
+        self.can_scroll = False
         self.factory_reset_confirmation = None
         self.state = self.load_state()
 
@@ -62,12 +63,7 @@ class SemanticSearchGUI:
         self.import_thread.start()
         self.query_frame = ctk.CTkFrame(self.main_window)
         self.queries_results_frame=ctk.CTkScrollableFrame(self.main_window)
-        #windows scrolling
-        #self.queries_results_frame.bind_all("<MouseWheel>", self.scroll_results_frame)
-        #linux scrolling
-        #self.queries_results_frame.bind_all("<Button-4>", self.scroll_results_frame)  
-        #self.queries_results_frame.bind_all("<Button-5>", self.scroll_results_frame)  
-        
+
         if self.is_first_run == True:   
             self.fresh_start()
             self.queries_results_frame.pack(fill='both',expand=True)
@@ -95,8 +91,10 @@ class SemanticSearchGUI:
         Return a list of recently opened PDFs by filename.
         """
         files_times = []
+
         if not os.path.isdir(PDFS_DIR):
             os.mkdir(PDFS_DIR)
+
         for child in PDFS_DIR.iterdir():
             if child.is_file():
                 try:
@@ -209,6 +207,7 @@ class SemanticSearchGUI:
         if should_stick_to_bottom:
             self.queries_results_frame._parent_canvas.yview_moveto(1.0)
         self.main_window.update()
+        self.handle_entries_added_removed()
 
     def load_known_pdf(self,pdf_path:str)-> None:
         """
@@ -349,9 +348,34 @@ class SemanticSearchGUI:
                     if should_stick_to_bottom:
                         self.queries_results_frame._parent_canvas.yview_moveto(1.0)
                     self.main_window.update()
+                    self.handle_entries_added_removed()
                         
                     
-                    
+    def handle_entries_added_removed(self):
+        canvas = self.queries_results_frame._parent_canvas
+        canvas.update_idletasks()
+        scroll_region = canvas.cget("scrollregion").split()
+        full_height = float(scroll_region[3]) - float(scroll_region[1])
+        visible_height = canvas.winfo_height()
+        if full_height > visible_height:
+            if self.can_scroll == False:
+                #Enable scroll binding
+                #windows
+                self.queries_results_frame.bind_all("<MouseWheel>", self.scroll_results_frame)
+                #linux
+                self.queries_results_frame.bind_all("<Button-4>", self.scroll_results_frame)  
+                self.queries_results_frame.bind_all("<Button-5>", self.scroll_results_frame)  
+                self.can_scroll = True
+        else:            
+            if self.can_scroll == True:
+                #Enable scroll binding
+                #windows
+                self.queries_results_frame.unbind_all("<MouseWheel>")
+                #linux
+                self.queries_results_frame.unbind_all("<Button-4>")  
+                self.queries_results_frame.unbind_all("<Button-5>")  
+                self.can_scroll = False
+
     def display_results(self,query:str, results: list[int])->None:
         """
         Once all pages have been searched and the top 5 results have been found, 
