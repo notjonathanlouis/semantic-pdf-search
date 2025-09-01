@@ -49,6 +49,7 @@ class SemanticSearchGUI:
           embedded PDFs, present the main window to the user, start a thread to load the sentence-encoders module.
         """
         self.menubar = None
+        self.current_pdf_path = None
         self.can_scroll = False
         self.factory_reset_confirmation = None
         self.state = self.load_state()
@@ -59,17 +60,17 @@ class SemanticSearchGUI:
         ctk.set_default_color_theme("blue")
         self.main_window=ctk.CTk()
         self.main_window.protocol("WM_DELETE_WINDOW", self.save_state_and_close)
+        
         self.import_thread:Thread=Thread(target = self.import_from_main)
         self.import_thread.start()
         self.query_frame = ctk.CTkFrame(self.main_window)
         self.queries_results_frame=ctk.CTkScrollableFrame(self.main_window)
-
+        self.main_window.bind("<Configure>",self.update_should_scroll)
         if self.is_first_run == True:   
             self.fresh_start()
             self.queries_results_frame.pack(fill='both',expand=True)
         
         self.populate_file_dialogue()
-        
 
     def import_from_main(self)->None:
         """
@@ -199,7 +200,6 @@ class SemanticSearchGUI:
                 if widget.cget('text') == query:
                     target_row = widget.grid_info()['row']
         should_stick_to_bottom = False
-        print(self.queries_results_frame._parent_canvas.yview()[1])
         if self.queries_results_frame._parent_canvas.yview()[1] == 1.0:
             should_stick_to_bottom = True        
         for widget in self.queries_results_frame.grid_slaves(row=target_row):
@@ -207,7 +207,7 @@ class SemanticSearchGUI:
         if should_stick_to_bottom:
             self.queries_results_frame._parent_canvas.yview_moveto(1.0)
         self.main_window.update()
-        self.handle_entries_added_removed()
+        self.update_should_scroll()
 
     def load_known_pdf(self,pdf_path:str)-> None:
         """
@@ -330,7 +330,6 @@ class SemanticSearchGUI:
                     self.state[self.current_pdf_path][entry]=self.searcher(entry,top_k=5)
                     [ _ , num_rows ] = self.queries_results_frame.grid_size()
                     should_stick_to_bottom = False
-                    print(self.queries_results_frame._parent_canvas.yview()[1])
                     if self.queries_results_frame._parent_canvas.yview()[1] == 1.0:
                         should_stick_to_bottom = True
                     self.queries_results_frame.rowconfigure(num_rows,weight=1)
@@ -348,33 +347,35 @@ class SemanticSearchGUI:
                     if should_stick_to_bottom:
                         self.queries_results_frame._parent_canvas.yview_moveto(1.0)
                     self.main_window.update()
-                    self.handle_entries_added_removed()
+                    self.update_should_scroll()
                         
                     
-    def handle_entries_added_removed(self):
-        canvas = self.queries_results_frame._parent_canvas
-        canvas.update_idletasks()
-        scroll_region = canvas.cget("scrollregion").split()
-        full_height = float(scroll_region[3]) - float(scroll_region[1])
-        visible_height = canvas.winfo_height()
-        if full_height > visible_height:
-            if self.can_scroll == False:
-                #Enable scroll binding
-                #windows
-                self.queries_results_frame.bind_all("<MouseWheel>", self.scroll_results_frame)
-                #linux
-                self.queries_results_frame.bind_all("<Button-4>", self.scroll_results_frame)  
-                self.queries_results_frame.bind_all("<Button-5>", self.scroll_results_frame)  
-                self.can_scroll = True
-        else:            
-            if self.can_scroll == True:
-                #Enable scroll binding
-                #windows
-                self.queries_results_frame.unbind_all("<MouseWheel>")
-                #linux
-                self.queries_results_frame.unbind_all("<Button-4>")  
-                self.queries_results_frame.unbind_all("<Button-5>")  
-                self.can_scroll = False
+    def update_should_scroll(self, event = None)->None:
+        if self.queries_results_frame != None and self.current_pdf_path != None:
+            canvas = self.queries_results_frame._parent_canvas
+            canvas.update_idletasks()
+            if canvas.cget("scrollregion"):
+                scroll_region = canvas.cget("scrollregion").split()
+                full_height = float(scroll_region[3]) - float(scroll_region[1])
+                visible_height = canvas.winfo_height()
+                if full_height > visible_height:
+                    if self.can_scroll == False:
+                        #Enable scroll binding
+                        #windows
+                        self.queries_results_frame.bind_all("<MouseWheel>", self.scroll_results_frame)
+                        #linux
+                        self.queries_results_frame.bind_all("<Button-4>", self.scroll_results_frame)  
+                        self.queries_results_frame.bind_all("<Button-5>", self.scroll_results_frame)  
+                        self.can_scroll = True
+                else:            
+                    if self.can_scroll == True:
+                        #Enable scroll binding
+                        #windows
+                        self.queries_results_frame.unbind_all("<MouseWheel>")
+                        #linux
+                        self.queries_results_frame.unbind_all("<Button-4>")  
+                        self.queries_results_frame.unbind_all("<Button-5>")  
+                        self.can_scroll = False
 
     def display_results(self,query:str, results: list[int])->None:
         """
