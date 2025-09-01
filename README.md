@@ -1,7 +1,6 @@
 <h1 align="center"><b>
 	semantic-pdf-search
 </b></h1>
------
 
 <h4 align="center"><b>
 A semantic PDF searching application, written in Python. 🔎	
