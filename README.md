@@ -1,9 +1,15 @@
-# semantic-pdf-search
+<h1 align="center"><b>
+	semantic-pdf-search
+</b></h1>
+-----
 
-**A semantic PDF searching application, written in Python.** 🔎
+<h4 align="center"><b>
+A semantic PDF searching application, written in Python. 🔎	
+</b></h4>
 
+<p align="center">
 By Jordan Zedeck and Jonathan Louis
-
+</p>
 
 
 ## 📖 Overview
