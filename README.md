@@ -1,9 +1,9 @@
 <h1 align="center"><b>
 	semantic-pdf-search
-</b></h1>
+</b></h1>n
 
 <h4 align="center"><b>
-A semantic PDF searching application, written in Python. 🔎	
+A semantic PDF searching application, written in Python.
 </b></h4>
 
 <p align="center">
@@ -11,17 +11,17 @@ By Jordan Zedeck and Jonathan Louis
 </p>
 
 
-## 📖 Overview
+## Overview
 
 This application utilizes a machine learning embedding model to encode both a PDF document and a user's queries. This process enables the application to find near-matches to the query within the document, much like an internet search engine would for web-pages. The page number results are displayed as buttons which can be clicked to open the PDF directly to the page in your default web browser.
 
-## ✨ Features
+## Features
 
   * **Semantic Search:** Finds near-matches and related concepts, not just exact keywords.
   * **Offline Operability:** Once semantic-pdf-search is installed and used once, it can be used completely offline.
   * **Cross-Platform:** Supports Linux, Windows and macOS.
 
-## 🖼️ Example
+## Example
 
 **Query:** 
 
@@ -31,7 +31,7 @@ This application utilizes a machine learning embedding model to encode both a PD
 
 ![alt text](assets/great-gatsby-result.png)
 
-## 💻 Installation
+## Installation
 
 ### Prerequisites
 
@@ -74,7 +74,7 @@ python -m build
 pip install dist/semantic_pdf_search-0.8.0-py3-none-any.whl
 ```
 
-## 🚀 Launching semantic-pdf-search
+## Launching semantic-pdf-search
 
 Once installed, run the application from your command line:
 
