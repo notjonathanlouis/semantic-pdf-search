@@ -25,11 +25,11 @@ This application utilizes a machine learning embedding model to encode both a PD
 
 **Query:** 
 
-![alt text](assets/great-gatsby-search.png)
+![alt text](https://raw.githubusercontent.com/notjonathanlouis/semantic-pdf-search/refs/heads/main/assets/great-gatsby-search.png)
 
 **Result:**
 
-![alt text](assets/great-gatsby-result.png)
+![alt text](https://raw.githubusercontent.com/notjonathanlouis/semantic-pdf-search/refs/heads/main/assets/great-gatsby-result.png)
 
 ## Installation
 
