@@ -60,7 +60,7 @@ class SemanticSearchGUI:
         ctk.set_default_color_theme("blue")
         self.main_window=ctk.CTk()
         self.main_window.protocol("WM_DELETE_WINDOW", self.save_state_and_close)
-        
+        self.main_window.geometry("800x600")
         self.import_thread:Thread=Thread(target = self.import_from_main)
         self.import_thread.start()
         self.query_frame = ctk.CTkFrame(self.main_window)
@@ -157,7 +157,7 @@ class SemanticSearchGUI:
         Load previous queries from state and display results to user.
         """
         if self.state != None and pdf_path in self.state: 
-            self.queries_results_frame.columnconfigure(0,weight=1)
+
             self.queries_results_frame.columnconfigure(1,weight=1)
             
             for i,query in enumerate(self.state[pdf_path]):
@@ -168,12 +168,15 @@ class SemanticSearchGUI:
                 query_label.grid(column=0, row=i, sticky=ctk.EW, padx=10, pady=10)
                 query_results=ctk.CTkFrame(self.queries_results_frame)
                 query_results.grid(column=1, row=i, sticky=ctk.EW, padx=10, pady=10)
-                for result in self.state[pdf_path][query]:
+                for i, result in enumerate(self.state[pdf_path][query]):
                     #add result as button 
+                    query_results.columnconfigure(i,weight=1)
                     query_result = ctk.CTkButton(query_results,text=str(result), command = lambda pdf_path=pdf_path,result=result: self.open_pdf(pdf_path, result))
-                    query_result.pack(side=ctk.LEFT)
+                    query_result.grid(column=i, row=0, sticky=ctk.EW)
+                query_results.columnconfigure(len(self.state[pdf_path][query]),weight=1)
                 delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=query: self.remove_query_result(query=query))
-                delete_query_button.pack(side=ctk.LEFT)
+                delete_query_button.grid(column=len(self.state[pdf_path][query]), row=0, sticky=ctk.EW)
+
             self.queries_results_frame.pack(fill='both',expand=True)  
 
     def scroll_results_frame(self, event):
@@ -332,8 +335,10 @@ class SemanticSearchGUI:
         if self.state != None:
             if self.current_pdf_path not in self.state:
                 self.state[self.current_pdf_path]={entry:self.searcher(entry,top_k=5)}
+                self.queries_results_frame.columnconfigure(1,weight=1)
             elif entry not in self.state[self.current_pdf_path]:
                 self.state[self.current_pdf_path][entry]=self.searcher(entry,top_k=5)
+                self.queries_results_frame.columnconfigure(1,weight=1)
             else:
                 return
             [ _ , num_rows ] = self.queries_results_frame.grid_size()
@@ -346,22 +351,35 @@ class SemanticSearchGUI:
             query_label.grid(column=0, row=num_rows, sticky=ctk.EW, padx=10, pady=10)
             query_results=ctk.CTkFrame(self.queries_results_frame)
             query_results.grid(column=1, row=num_rows, sticky=ctk.EW, padx=10, pady=10)
-            for result in self.state[self.current_pdf_path][entry]:
+            for i, result in enumerate(self.state[self.current_pdf_path][entry]):
                 #add result as button 
+                query_results.columnconfigure(i, weight=1)
                 query_result = ctk.CTkButton(query_results,text=str(result), command = lambda pdf_path=self.current_pdf_path,result=result: self.open_pdf(pdf_path, result))
-                query_result.pack(side=ctk.LEFT)
+                query_result.grid(column=i, row=0, sticky=ctk.EW)
+            query_results.columnconfigure(len(self.state[self.current_pdf_path][entry]), weight=1)
             delete_query_button=ctk.CTkButton(query_results,text="Remove",command=lambda query=entry: self.remove_query_result(query=query))
-            delete_query_button.pack(side=ctk.LEFT)
+            delete_query_button.grid(column=len(self.state[self.current_pdf_path][entry]), row=0, sticky=ctk.EW)
             if should_stick_to_bottom:
                 self.queries_results_frame._parent_canvas.yview_moveto(1.0)
+            self.queries_results_frame.pack(fill='both',expand=True)
+            
             self.main_window.update()
             self.update_should_scroll()
                     
                     
+
+
     def update_should_scroll(self, event = None)->None:
         if self.queries_results_frame != None and self.current_pdf_path != None:
             canvas = self.queries_results_frame._parent_canvas
-            canvas.update_idletasks()
+
+            # Wrap entry label text to 20% of current window size
+            window_width = self.main_window.winfo_width()
+            wraplength_value = int(window_width * 0.20)
+
+            for widget in self.queries_results_frame.winfo_children():
+                if isinstance(widget, ctk.CTkLabel):
+                    widget.configure(wraplength=wraplength_value)
             if canvas.cget("scrollregion"):
                 scroll_region = canvas.cget("scrollregion").split()
                 full_height = float(scroll_region[3]) - float(scroll_region[1])
