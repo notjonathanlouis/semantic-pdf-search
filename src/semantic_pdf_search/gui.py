@@ -2,10 +2,14 @@ import customtkinter as ctk
 import tkinter as tk
 from typing import Optional
 import os
+import sys
 import shutil
 from pathlib import Path
 import webbrowser
 import pymupdf
+import webbrowser
+import http.server
+import socketserver
 from threading import Thread
 import pickle
 
@@ -52,25 +56,160 @@ class SemanticSearchGUI:
         self.current_pdf_path = None
         self.can_scroll = False
         self.factory_reset_confirmation = None
-        self.state = self.load_state()
+        self.server_thread = None
+        self.http_daemon = None
 
+        self.state = self.load_state()
         self.pdfs = self.get_recent_pdfs()
 
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
         self.main_window=ctk.CTk()
         self.main_window.protocol("WM_DELETE_WINDOW", self.save_state_and_close)
+        if sys.platform == 'darwin':
+            self.main_window.bind('<Command-q>', self.on_closing)
+            self.main_window.bind('<Command-Q>', self.on_closing)
+
+        
         self.main_window.geometry("800x600")
+
+        self.main_window.title("semantic-pdf-search")
         self.import_thread:Thread=Thread(target = self.import_from_main)
         self.import_thread.start()
+        self.home_frame = ctk.CTkFrame(self.main_window)
+        self.settings_frame = ctk.CTkFrame(self.main_window)
         self.query_frame = ctk.CTkFrame(self.main_window)
         self.queries_results_frame=ctk.CTkScrollableFrame(self.main_window)
         self.main_window.bind("<Configure>",self.update_should_scroll)
-        if self.is_first_run == True:   
-            self.fresh_start()
-            self.queries_results_frame.pack(fill='both',expand=True)
+        if self.is_first_run == True:
+            #self.fresh_start()
+            ...
+            
+        self.build_home_menu()
+        self.build_settings_menu()
+        self.build_search_bar()
+
+        self.home_frame.pack(fill='both',expand=True)
         
         self.populate_file_dialogue()
+
+
+    def fresh_start(self)-> None:
+        """
+        User opens app, told to select File ... -> Browse for PDF
+        """
+        intro = ctk.CTkLabel(self.queries_results_frame, text="To start a search, first select a PDF. \n " \
+        "Click on File ... -> Open ... -> Browse for PDF.", font=ctk.CTkFont(size=20, weight="bold"))
+        
+        intro.grid(column=1,row=1)
+        
+        ...
+
+    def hide_all_frames(self) -> None:
+        if self.queries_results_frame.winfo_manager():
+            self.queries_results_frame.pack_forget()
+        if self.query_frame.winfo_manager():
+            self.query_frame.pack_forget()
+        if self.home_frame.winfo_manager():
+            self.home_frame.pack_forget()
+        if self.settings_frame.winfo_manager():
+            self.settings_frame.pack_forget()
+            
+    def show_home_frame(self) -> None:
+        self.hide_all_frames()
+        self.home_frame.pack(fill='both',expand=True)
+    
+    def show_queries_frame(self) -> None:
+        self.hide_all_frames()
+        self.queries_results_frame.pack(fill='both',expand=True)
+    
+    
+
+    def show_settings_frame(self) -> None:
+        self.hide_all_frames()
+        self.settings_frame.pack(fill='both',expand=True)
+
+    def build_home_menu(self) -> None:
+        """
+        Present a menu to the user that can perform the same functionality as the menubar.
+        Required as menubar may not be easily accesible on certain platforms.
+        """
+        self.home_frame.columnconfigure(0,weight = 1)
+        self.home_frame.columnconfigure(1,weight = 1)
+        self.home_frame.rowconfigure(0,weight=1)
+
+        commands_frame = ctk.CTkFrame(self.home_frame)
+        commands_frame.grid(column=0,row=0,sticky=tk.NSEW)
+        for i in range(0,2):
+            commands_frame.columnconfigure(i,weight=1)
+        for i in range(0,6):
+            commands_frame.rowconfigure(i,weight=1)
+
+        title_text = ctk.CTkLabel(commands_frame, text= "Start")
+        title_text.grid(column=1, row=1)
+
+        browse_button = ctk.CTkButton(commands_frame, text="Browse for PDF", command = self.browse_for_pdf)
+        browse_button.grid(column=1, row=2)
+        
+        settings_button = ctk.CTkButton(commands_frame, text="Settings", command = self.show_settings_frame)
+        settings_button.grid(column=1, row=3)
+        quit_button = ctk.CTkButton(commands_frame, text="Quit", command = self.save_state_and_close)
+        quit_button.grid(column=1,row=5, pady=10)
+
+        recents_frame  = ctk.CTkFrame(self.home_frame)
+        recents_frame.grid(column=1,row=0,sticky=tk.NSEW)
+        for i in range(0,3):
+            recents_frame.columnconfigure(i,weight=1)
+        for i in range(0,4):
+            recents_frame.rowconfigure(i,weight=1)
+            
+        recent_text = ctk.CTkLabel(recents_frame, text= "Recent")
+        recent_text.grid(column=1,row=1)
+        recent_pdfs_frame = ctk.CTkScrollableFrame(recents_frame)
+        recent_pdfs_frame.grid(column = 1, row = 2, sticky = tk.NSEW)
+        recent_pdfs_frame.columnconfigure(1,weight=1)
+        for i, path in enumerate(self.get_recent_pdfs()):
+            recent_pdfs_frame.rowconfigure(i,weight=1)
+            recent_pdf_button = ctk.CTkButton(recent_pdfs_frame, text=Path(path).name, command = lambda path = path: self.load_pdf(path))
+            recent_pdf_button.grid(column=1,row=i+1, pady=5, sticky=tk.EW)
+        
+        ...
+    
+    def build_settings_menu(self) -> None:
+        for i in range(3):
+            self.settings_frame.columnconfigure(i, weight=1)
+        for i in range(4):
+            self.settings_frame.rowconfigure(i, weight=1)
+        
+        title_text = ctk.CTkLabel(self.settings_frame, text= "Settings")
+        factory_reset_button = ctk.CTkButton(self.settings_frame, text="Reset to factory settings", command = self.spawn_reset_window)
+        title_text = ctk.CTkLabel(self.settings_frame, text= "Return Home")
+        back_home_button = ctk.CTkButton(self.settings_frame, text="Home", command = self.show_home_frame)
+        for i,child in enumerate(self.settings_frame.winfo_children()):
+            child.grid(row=i,column=1,sticky=tk.EW,padx=10,pady=10)
+        ...
+
+    def build_search_bar(self)->None:
+        """
+        A new frame is shown and the user is given a button which, 
+        when pressed, presents an entry field for the user to enter a search query. 
+        """
+        self.query_frame.columnconfigure(0, weight=12)
+        self.query_frame.columnconfigure(1, weight=5)
+        self.query_frame.columnconfigure(2, weight=1)
+        self.query_frame.columnconfigure(3, weight=10)
+        self.query_frame.columnconfigure(4, weight=1)
+        self.query_frame.columnconfigure(5, weight=1)
+        self.query_frame.columnconfigure(6, weight=1)
+
+        entry_text=tk.StringVar()
+        query_entry_field = ctk.CTkEntry(self.query_frame,textvariable=entry_text)
+        query_entry_instructions = ctk.CTkLabel(self.query_frame,text="Enter query:")
+        query_entry_instructions.grid(column = 1, row = 0, sticky = ctk.EW)
+        query_entry_field.bind("<Return>", lambda event: self.handle_enter_query(entry_text.get()))
+        query_entry_field.grid(column = 3, row = 0, sticky = ctk.EW)
+        back_home_button = ctk.CTkButton(self.query_frame, text="Home", command = self.show_home_frame)
+        back_home_button.grid(column = 5, row = 0, sticky = ctk.EW)
 
     def import_from_main(self)->None:
         """
@@ -105,7 +244,6 @@ class SemanticSearchGUI:
         files_times.sort(key=lambda x: x[1], reverse=True)
         return [file for file, _ in files_times[:10]]
 
-        
     def populate_file_dialogue(self) -> None:
         """
         Populates the file dialogue. This includes buttons to load previously embedded PDFs and one to embed a new PDF from a file dialogue.
@@ -148,10 +286,8 @@ class SemanticSearchGUI:
             self.menubar.add_command(label="")
             
            
-           
-            
-        
-    
+         
+
     def get_previous_queries(self, pdf_path: str) -> None:
         """
         Load previous queries from state and display results to user.
@@ -221,11 +357,18 @@ class SemanticSearchGUI:
         Originally there were supposed to be two functions depending on if the embedding file existed for that PDF but they would be 
         largely identical because the call to ``Searcher.forPDF()`` handles this case internally. 
         """
+
+        if self.current_pdf_path == pdf_path :
+            self.show_queries_frame()
+            self.query_frame.pack(side=tk.BOTTOM,fill='both',pady=50)
+            return
+
         for widget in self.queries_results_frame.winfo_children():
             widget.destroy()
 
-        self.query_frame.destroy()
         
+        self.show_queries_frame()
+
         progress_bar= ctk.CTkProgressBar(self.main_window,mode="determinate")
         progress_bar.pack(side=ctk.BOTTOM,padx=20,pady=20,fill='x',anchor='center')
         progress_text= ctk.CTkLabel(self.main_window,text="Importing Libraries")
@@ -253,13 +396,16 @@ class SemanticSearchGUI:
         progress_text.configure(text="Finalizing")
         
         self.main_window.update()
-        self.main_window.title(f"Semantic search: {Path(pdf_path).name}")
+        self.main_window.title(f"semantic-pdf-search: {Path(pdf_path).name}")
         self.menubar.delete(2)
         self.menubar.insert_command(2,label=f"Current PDF: {Path(pdf_path).name}")
         progress_bar.destroy()
-        self.show_search_bar()
+        
+        self.query_frame.pack(side=tk.BOTTOM,fill='both',pady=50)
+
         progress_text.destroy()
         ...
+
     def browse_for_pdf(self)-> None:
         """
         This function opens the file dialog and allows the user to select a PDF. The selected
@@ -290,44 +436,50 @@ class SemanticSearchGUI:
                     new_path = PDFS_DIR / f"_{Path(filepath).name}"
                     shutil.copy(filepath,new_path)
                     self.load_pdf(str(new_path))
+                for child in self.home_frame.winfo_children():
+                    child.destroy()
+                self.build_home_menu()
                 self.populate_file_dialogue()
             else:
                 self.load_pdf(filepath)
             reader.close()
 
-
     def open_pdf(self, pdf_path: str, page : int)-> None:
         """
         TODO: handle mac opening pdfs in webbrowser by using local server to host the PDF 
         """
-        webbrowser.open(f"file://{pdf_path}#page={page}")
+        if sys.platform != 'darwin':
+            webbrowser.open(f"file://{pdf_path}#page={page}")
+        else:
+            if not self.http_daemon and not self.server_thread:
+                self.serve_pdfs(8080)
+            webbrowser.open(f"http://localhost:{8080}/{Path(pdf_path).name}#page={page}")
 
-    def fresh_start(self)-> None:
-        """
-        User opens app, told to select File ... -> Browse for PDF
-        """
-        intro = ctk.CTkLabel(self.queries_results_frame, text="To start a search, first select a PDF. \n " \
-        "Click on File ... -> Open ... -> Browse for PDF.", font=ctk.CTkFont(size=20, weight="bold"))
+    def serve_pdfs(self, port : int)->None:
+        if self.http_daemon:
+            self.http_daemon.shutdown()
+        if self.server_thread:
+            self.server_thread.join()
         
-        intro.grid(column=1,row=1)
-        
-        ...
+        os.chdir(PDFS_DIR)
+
+        # workaround to suppress terminal outputs
+        class http_req_handler(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, format, *args):
+                pass
+
+        try:
+            httpd = socketserver.TCPServer(("",port),http_req_handler)
+        except OSError as e:
+            print(f"FAILURE TO START FILESERVER. PORT {port} IS IN USE")
+            return
+
+        self.server_thread = Thread(target=httpd.serve_forever,daemon=True)
+        self.server_thread.start()
+        self.http_daemon = httpd
 
     
-    def show_search_bar(self)->None:
-        """
-        A new frame is shown and the user is given a button which, 
-        when pressed, presents an entry field for the user to enter a search query. 
-        """
-        self.query_frame = ctk.CTkFrame(self.main_window)
-        self.query_frame.pack(side=tk.BOTTOM,pady=50)
-        entry_text=tk.StringVar()
-        query_entry_field = ctk.CTkEntry(self.query_frame,textvariable=entry_text)
-        query_entry_instructions = ctk.CTkLabel(self.query_frame,text="Enter query:")
-        query_entry_instructions.pack(side=tk.LEFT,padx=20)
-        query_entry_field.bind("<Return>", lambda event: self.handle_enter_query(entry_text.get()))
-        query_entry_field.pack(side=tk.BOTTOM)
-
+    
     def handle_enter_query(self, entry:str )->None:
         """
         The query is searched for and the results are displayed to the user. The results are also stored to the state.
@@ -432,6 +584,10 @@ class SemanticSearchGUI:
         The query, the PDF hash, and all the results are stored to a 
         pickle dictionary file. 
         """
+        if self.http_daemon:
+            self.http_daemon.shutdown()
+        if self.server_thread:
+            self.server_thread.join()
         directory=Path(__file__).parent
         file=Path("state.pck")
         with open(directory / file, "wb") as f:

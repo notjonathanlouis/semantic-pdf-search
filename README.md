@@ -84,7 +84,7 @@ semantic-pdf-search
 
 ### Basic Usage Guide
 
-1.  **Browse for a PDF:** Click on "File ..." -> "Open ..." -> "Browse for PDF" to browse for a PDF file.
+1.  **Browse for a PDF:** Click on "Browse for PDF" to browse for a PDF file.
 2.  **Select and Open:** Navigate to your PDF, select it, and click "Open".
 3.  **Wait for Embeddings:** The application will process the document and create embeddings. This may take a moment, especially for large files.
 4.  **Enter a Query:** Once the document is loaded, type your query into the search bar and press **Enter**.
