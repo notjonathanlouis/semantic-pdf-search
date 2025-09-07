@@ -67,8 +67,8 @@ class SemanticSearchGUI:
         self.main_window=ctk.CTk()
         self.main_window.protocol("WM_DELETE_WINDOW", self.save_state_and_close)
         if sys.platform == 'darwin':
-            self.main_window.bind('<Command-q>', self.on_closing)
-            self.main_window.bind('<Command-Q>', self.on_closing)
+            self.main_window.bind('<Command-q>', self.save_state_and_close)
+            self.main_window.bind('<Command-Q>', self.save_state_and_close)
 
         
         self.main_window.geometry("800x600")
